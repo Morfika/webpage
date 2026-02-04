@@ -84,13 +84,13 @@ const GiveawayModal = ({ giveaway, onClose, instagramFollowers = 0 }: GiveawayMo
             <h4 className="font-semibold text-foreground mb-2">Requisito para participar:</h4>
             <div className="flex items-center gap-3">
               <Instagram className="w-5 h-5 text-morfika-glow" />
-              <span className="text-muted-foreground">Seguir a @morfika3d en Instagram</span>
+              <span className="text-muted-foreground">Seguir a @dmorfika en Instagram</span>
             </div>
           </div>
 
           {/* CTA */}
           <a
-            href="https://instagram.com/morfika3d"
+            href="https://instagram.com/dmorfika"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-glow w-full mt-6 py-3 rounded-lg font-semibold text-center flex items-center justify-center gap-2"
