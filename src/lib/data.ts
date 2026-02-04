@@ -401,27 +401,60 @@ export const deleteGiveaway = async (id: string): Promise<boolean> => {
 const defaultPrinters: Printer[] = [
   {
     id: "1",
-    name: "Ender 3 V2",
-    image: "/placeholder.svg",
+    name: "Creality Ender 3 V3 KE",
+    image: "/src/assets/ender3v3ke.png",
     materials: ["PLA", "PETG", "TPU"],
-    dimensions: "220 x 220 x 250 mm",
-    description: "Impresora FDM de alta precisión"
+    dimensions: "220 x 220 x 240 mm",
+    description: "Impresora FDM rápida con extrusor directo, nivelación automática CR-Touch y firmware Klipper"
   },
   {
     id: "2",
-    name: "Artillery Sidewinder X2",
-    image: "/placeholder.svg",
+    name: "Anycubic Kobra 2 Max",
+    image: "/src/assets/anycubickobra2max.png",
     materials: ["PLA", "ABS", "PETG", "TPU", "Nylon"],
+    dimensions: "420 x 420 x 500 mm",
+    description: "Impresora FDM de gran formato con sistema LeviQ 2.0, alta velocidad y cama magnética PEI"
+  },
+  {
+    id: "3",
+    name: "Creality CR-10 SE",
+    image: "/src/assets/cr10se.png",
+    materials: ["PLA", "PETG", "TPU", "ABS", "Nylon"],
     dimensions: "300 x 300 x 400 mm",
-    description: "Gran volumen de impresión"
+    description: "Impresora FDM con extrusor directo Sprite, nivelación automática y alto rendimiento para piezas grandes"
+  },
+  {
+    id: "4",
+    name: "Anycubic Photon Mono X2",
+    image: "/src/assets/photonmonox2.png",
+    materials: ["Resina estándar", "Resina ABS-like", "Resina flexible", "Resina lavable en agua"],
+    dimensions: "196 x 122 x 200 mm",
+    description: "Impresora 3D de resina con pantalla monocromática 4K, alta precisión y excelente detalle en miniaturas"
+  },
+  {
+    id: "5",
+    name: "Bambu Lab A1 Combo",
+    image: "/src/assets/A1combo.png",
+    materials: ["PLA", "PETG", "TPU", "ABS", "ASA", "Nylon"],
+    dimensions: "256 x 256 x 256 mm",
+    description: "Impresora FDM de alta velocidad con sistema AMS Lite para impresión multicolor, nivelación automática y excelente calidad desde fábrica"
+  },
+  {
+    id: "6",
+    name: "Elegoo Centauri Carbon",
+    image: "/src/assets/centauricarbon.png",
+    materials: ["PLA", "PETG", "TPU", "ABS", "ASA", "Nylon", "Fibra de carbono"],
+    dimensions: "320 x 320 x 400 mm",
+    description: "Impresora FDM de gran formato con estructura reforzada, hotend de alta temperatura y compatibilidad con filamentos técnicos"
   }
 ];
 
+
 const defaultGallery: GalleryItem[] = [
-  { id: "1", image: "/placeholder.svg", title: "Figuras Anime", description: "Colección de figuras anime" },
-  { id: "2", image: "/placeholder.svg", title: "Piezas Mecánicas", description: "Prototipado industrial" },
-  { id: "3", image: "/placeholder.svg", title: "Arte Decorativo", description: "Esculturas y arte" },
-  { id: "4", image: "/placeholder.svg", title: "Accesorios Gaming", description: "Para tu setup" }
+  { id: "1", image: "/src/assets/gallery-1.jpg", title: "Figuras Anime", description: "Colección de figuras anime" },
+  { id: "2", image: "/src/assets/gallery-2.jpg", title: "Piezas Mecánicas", description: "Prototipado industrial" },
+  { id: "3", image: "/src/assets/hero-3d-print.jpg", title: "Arte Decorativo", description: "Esculturas y arte" },
+  { id: "4", image: "/src/assets/printer-1.jpg", title: "Accesorios Gaming", description: "Para tu setup" }
 ];
 
 export const getPrinters = (): Printer[] => {

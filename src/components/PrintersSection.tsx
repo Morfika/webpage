@@ -1,6 +1,5 @@
 import { Layers, Maximize } from "lucide-react";
 import { getPrinters } from "@/lib/data";
-import printerImage from "@/assets/printer-1.jpg";
 
 const PrintersSection = () => {
   const printers = getPrinters();
@@ -27,7 +26,7 @@ const PrintersSection = () => {
             >
               <div className="aspect-video bg-muted relative overflow-hidden">
                 <img
-                  src={printerImage}
+                  src={printer.image}
                   alt={printer.name}
                   className="w-full h-full object-cover"
                 />
