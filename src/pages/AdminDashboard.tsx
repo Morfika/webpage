@@ -22,6 +22,7 @@ import {
   type Giveaway
 } from "@/lib/data";
 import { getInstagramFollowers } from "@/lib/instagram";
+import { uploadImage, deleteImage } from "@/lib/supabase";
 import { 
   Printer, 
   LogOut, 
@@ -32,7 +33,9 @@ import {
   Trash2,
   Edit,
   X,
-  Save
+  Save,
+  Upload,
+  Loader
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,11 +52,16 @@ const AdminDashboard = () => {
   const [giveaways, setGiveaways] = useState<Giveaway[]>([]);
   const [instagramFollowers, setInstagramFollowers] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingRaffle, setEditingRaffle] = useState<Raffle | null>(null);
   const [editingGiveaway, setEditingGiveaway] = useState<Giveaway | null>(null);
   const [showRaffleNumbers, setShowRaffleNumbers] = useState<Raffle | null>(null);
+  
+  const [productImagePreview, setProductImagePreview] = useState<string>("");
+  const [raffleImagePreview, setRaffleImagePreview] = useState<string>("");
+  const [giveawayImagePreview, setGiveawayImagePreview] = useState<string>("");
 
   useEffect(() => {
     if (!checkAuth()) {
@@ -94,6 +102,27 @@ const AdminDashboard = () => {
   const handleLogout = () => {
     logout();
     navigate("/admin");
+  };
+
+  // Image upload handler
+  const handleImageUpload = async (file: File, folder: 'products' | 'raffles' | 'giveaways', setPreview: (url: string) => void, setObject: (obj: any) => void, obj: any) => {
+    try {
+      setUploading(true);
+      const imageUrl = await uploadImage(file, folder);
+      
+      if (imageUrl) {
+        setPreview(imageUrl);
+        setObject({ ...obj, image: imageUrl });
+        toast({ title: "Imagen subida", description: "La imagen se guardó exitosamente" });
+      } else {
+        toast({ title: "Error", description: "No se pudo subir la imagen", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({ title: "Error", description: "Error al subir la imagen", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
   // Product handlers
@@ -367,7 +396,7 @@ const AdminDashboard = () => {
 
       {/* Edit Product Modal */}
       {editingProduct && (
-        <Modal onClose={() => setEditingProduct(null)}>
+        <Modal onClose={() => { setEditingProduct(null); setProductImagePreview(""); }}>
           <h3 className="text-xl font-bold mb-4">{editingProduct.id ? "Editar" : "Nuevo"} Producto</h3>
           <form onSubmit={(e) => { e.preventDefault(); saveProduct(editingProduct); }} className="space-y-4">
             <Input
@@ -393,12 +422,31 @@ const AdminDashboard = () => {
               onChange={(e) => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })}
               required
             />
-            <Input
-              placeholder="URL de imagen"
-              value={editingProduct.image}
-              onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
-            />
-            <Button type="submit" className="w-full btn-glow border-0">
+            
+            {/* Image Upload */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Imagen del Producto</label>
+              {(productImagePreview || editingProduct.image) && editingProduct.image !== "/placeholder.svg" && (
+                <img src={productImagePreview || editingProduct.image} alt="preview" className="w-full h-32 rounded-lg object-cover bg-muted" />
+              )}
+              <label className="flex items-center justify-center gap-2 p-3 rounded-lg border border-border bg-muted/30 cursor-pointer hover:bg-muted/50 transition">
+                <Upload className="w-4 h-4" />
+                <span className="text-sm">{uploading ? "Subiendo..." : "Selecciona imagen"}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      handleImageUpload(e.target.files[0], 'products', setProductImagePreview, setEditingProduct, editingProduct);
+                    }
+                  }}
+                  disabled={uploading}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            <Button type="submit" className="w-full btn-glow border-0" disabled={uploading}>
               <Save className="w-4 h-4 mr-2" />
               Guardar
             </Button>
@@ -435,12 +483,31 @@ const AdminDashboard = () => {
               value={editingRaffle.endDate}
               onChange={(e) => setEditingRaffle({ ...editingRaffle, endDate: e.target.value })}
             />
-            <Input
-              placeholder="URL de imagen"
-              value={editingRaffle.image}
-              onChange={(e) => setEditingRaffle({ ...editingRaffle, image: e.target.value })}
-            />
-            <Button type="submit" className="w-full btn-glow border-0">
+            
+            {/* Image Upload */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Imagen de la Rifa</label>
+              {(raffleImagePreview || editingRaffle.image) && editingRaffle.image !== "/placeholder.svg" && (
+                <img src={raffleImagePreview || editingRaffle.image} alt="preview" className="w-full h-32 rounded-lg object-cover bg-muted" />
+              )}
+              <label className="flex items-center justify-center gap-2 p-3 rounded-lg border border-border bg-muted/30 cursor-pointer hover:bg-muted/50 transition">
+                <Upload className="w-4 h-4" />
+                <span className="text-sm">{uploading ? "Subiendo..." : "Selecciona imagen"}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      handleImageUpload(e.target.files[0], 'raffles', setRaffleImagePreview, setEditingRaffle, editingRaffle);
+                    }
+                  }}
+                  disabled={uploading}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            <Button type="submit" className="w-full btn-glow border-0" disabled={uploading}>
               <Save className="w-4 h-4 mr-2" />
               Guardar
             </Button>
@@ -450,7 +517,7 @@ const AdminDashboard = () => {
 
       {/* Edit Giveaway Modal */}
       {editingGiveaway && (
-        <Modal onClose={() => setEditingGiveaway(null)}>
+        <Modal onClose={() => { setEditingGiveaway(null); setGiveawayImagePreview(""); }}>
           <h3 className="text-xl font-bold mb-4">{editingGiveaway.id ? "Editar" : "Nuevo"} Sorteo</h3>
           <form onSubmit={(e) => { e.preventDefault(); saveGiveaway(editingGiveaway); }} className="space-y-4">
             <Input
@@ -482,12 +549,31 @@ const AdminDashboard = () => {
               value={editingGiveaway.endDate}
               onChange={(e) => setEditingGiveaway({ ...editingGiveaway, endDate: e.target.value })}
             />
-            <Input
-              placeholder="URL de imagen"
-              value={editingGiveaway.image}
-              onChange={(e) => setEditingGiveaway({ ...editingGiveaway, image: e.target.value })}
-            />
-            <Button type="submit" className="w-full btn-glow border-0">
+            
+            {/* Image Upload */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Imagen del Sorteo</label>
+              {(giveawayImagePreview || editingGiveaway.image) && editingGiveaway.image !== "/placeholder.svg" && (
+                <img src={giveawayImagePreview || editingGiveaway.image} alt="preview" className="w-full h-32 rounded-lg object-cover bg-muted" />
+              )}
+              <label className="flex items-center justify-center gap-2 p-3 rounded-lg border border-border bg-muted/30 cursor-pointer hover:bg-muted/50 transition">
+                <Upload className="w-4 h-4" />
+                <span className="text-sm">{uploading ? "Subiendo..." : "Selecciona imagen"}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      handleImageUpload(e.target.files[0], 'giveaways', setGiveawayImagePreview, setEditingGiveaway, editingGiveaway);
+                    }
+                  }}
+                  disabled={uploading}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            <Button type="submit" className="w-full btn-glow border-0" disabled={uploading}>
               <Save className="w-4 h-4 mr-2" />
               Guardar
             </Button>
