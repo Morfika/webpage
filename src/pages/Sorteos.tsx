@@ -1,16 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { getRaffles, getGiveaways, type Raffle, type Giveaway } from "@/lib/data";
+import { getInstagramFollowers } from "@/lib/instagram";
 import { Gift, Instagram, Ticket, Calendar } from "lucide-react";
 import RaffleModal from "@/components/RaffleModal";
 import GiveawayModal from "@/components/GiveawayModal";
 
 const Sorteos = () => {
-  const [raffles] = useState<Raffle[]>(getRaffles());
-  const [giveaways] = useState<Giveaway[]>(getGiveaways());
+  const [raffles, setRaffles] = useState<Raffle[]>([]);
+  const [giveaways, setGiveaways] = useState<Giveaway[]>([]);
+  const [instagramFollowers, setInstagramFollowers] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
   const [selectedRaffle, setSelectedRaffle] = useState<Raffle | null>(null);
   const [selectedGiveaway, setSelectedGiveaway] = useState<Giveaway | null>(null);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [rafflesData, giveawaysData, followers] = await Promise.all([
+        getRaffles(),
+        getGiveaways(),
+        getInstagramFollowers()
+      ]);
+      setRaffles(rafflesData);
+      setGiveaways(giveawaysData);
+      setInstagramFollowers(followers);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -27,37 +51,43 @@ const Sorteos = () => {
             </p>
           </div>
 
-          {/* Giveaways Section */}
-          {giveaways.length > 0 && (
-            <div className="mb-16">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="p-2 rounded-lg bg-morfika-purple/20">
-                  <Instagram className="w-5 h-5 text-morfika-glow" />
-                </div>
-                <h2 className="text-2xl font-bold text-foreground">Sorteos Activos</h2>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {giveaways.map((giveaway) => (
-                  <div
-                    key={giveaway.id}
-                    onClick={() => setSelectedGiveaway(giveaway)}
-                    className="bg-card rounded-2xl overflow-hidden border border-border card-glow cursor-pointer group"
-                  >
-                    <div className="aspect-video bg-muted relative overflow-hidden">
-                      <img
-                        src={giveaway.image}
-                        alt={giveaway.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      {giveaway.active && (
-                        <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-morfika-glow/90 text-xs font-medium text-white">
-                          Activo
-                        </div>
-                      )}
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Cargando...</p>
+            </div>
+          ) : (
+            <>
+              {/* Giveaways Section */}
+              {giveaways.length > 0 && (
+                <div className="mb-16">
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="p-2 rounded-lg bg-morfika-purple/20">
+                      <Instagram className="w-5 h-5 text-morfika-glow" />
                     </div>
-                    <div className="p-6">
-                      <h3 className="text-xl font-bold mb-2 text-foreground">{giveaway.title}</h3>
+                    <h2 className="text-2xl font-bold text-foreground">Sorteos Activos</h2>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {giveaways.map((giveaway) => (
+                      <div
+                        key={giveaway.id}
+                        onClick={() => setSelectedGiveaway(giveaway)}
+                        className="bg-card rounded-2xl overflow-hidden border border-border card-glow cursor-pointer group"
+                      >
+                        <div className="aspect-video bg-muted relative overflow-hidden">
+                          <img
+                            src={giveaway.image}
+                            alt={giveaway.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                          {giveaway.active && (
+                            <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-morfika-glow/90 text-xs font-medium text-white">
+                              Activo
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-6">
+                          <h3 className="text-xl font-bold mb-2 text-foreground">{giveaway.title}</h3>
                       <p className="text-muted-foreground text-sm mb-4">{giveaway.description}</p>
                       
                       {/* Progress */}
@@ -156,7 +186,11 @@ const Sorteos = () => {
         <RaffleModal raffle={selectedRaffle} onClose={() => setSelectedRaffle(null)} />
       )}
       {selectedGiveaway && (
-        <GiveawayModal giveaway={selectedGiveaway} onClose={() => setSelectedGiveaway(null)} />
+        <GiveawayModal 
+          giveaway={selectedGiveaway} 
+          onClose={() => setSelectedGiveaway(null)}
+          instagramFollowers={instagramFollowers}
+        />
       )}
     </div>
   );

@@ -4,15 +4,24 @@ import {
   checkAuth, 
   logout,
   getProducts, 
-  saveProducts,
+  addProduct,
+  updateProduct,
+  deleteProduct as deleteProductDB,
   getRaffles,
-  saveRaffles,
+  addRaffle,
+  updateRaffle,
+  deleteRaffle as deleteRaffleDB,
+  updateRaffleNumber,
+  addRaffleNumbers,
   getGiveaways,
-  saveGiveaways,
+  addGiveaway,
+  updateGiveaway,
+  deleteGiveaway as deleteGiveawayDB,
   type Product,
   type Raffle,
   type Giveaway
 } from "@/lib/data";
+import { getInstagramFollowers } from "@/lib/instagram";
 import { 
   Printer, 
   LogOut, 
@@ -38,6 +47,8 @@ const AdminDashboard = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [giveaways, setGiveaways] = useState<Giveaway[]>([]);
+  const [instagramFollowers, setInstagramFollowers] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
   
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingRaffle, setEditingRaffle] = useState<Raffle | null>(null);
@@ -50,12 +61,34 @@ const AdminDashboard = () => {
       return;
     }
     loadData();
+    loadInstagramFollowers();
   }, [navigate]);
 
-  const loadData = () => {
-    setProducts(getProducts());
-    setRaffles(getRaffles());
-    setGiveaways(getGiveaways());
+  const loadData = async () => {
+    try {
+      const [productsData, rafflesData, giveawaysData] = await Promise.all([
+        getProducts(),
+        getRaffles(),
+        getGiveaways()
+      ]);
+      setProducts(productsData);
+      setRaffles(rafflesData);
+      setGiveaways(giveawaysData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast({ title: "Error", description: "No se pudieron cargar los datos", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadInstagramFollowers = async () => {
+    try {
+      const followers = await getInstagramFollowers();
+      setInstagramFollowers(followers);
+    } catch (error) {
+      console.error('Error loading Instagram followers:', error);
+    }
   };
 
   const handleLogout = () => {
@@ -64,89 +97,114 @@ const AdminDashboard = () => {
   };
 
   // Product handlers
-  const saveProduct = (product: Product) => {
-    const updated = product.id 
-      ? products.map(p => p.id === product.id ? product : p)
-      : [...products, { ...product, id: Date.now().toString() }];
-    setProducts(updated);
-    saveProducts(updated);
-    setEditingProduct(null);
-    toast({ title: "Producto guardado" });
+  const saveProduct = async (product: Product) => {
+    try {
+      if (product.id && product.id !== "") {
+        await updateProduct(product.id, product);
+      } else {
+        await addProduct(product);
+      }
+      toast({ title: "Producto guardado" });
+      setEditingProduct(null);
+      await loadData();
+    } catch (error) {
+      console.error('Error saving product:', error);
+      toast({ title: "Error", description: "No se pudo guardar el producto", variant: "destructive" });
+    }
   };
 
-  const deleteProduct = (id: string) => {
-    const updated = products.filter(p => p.id !== id);
-    setProducts(updated);
-    saveProducts(updated);
-    toast({ title: "Producto eliminado" });
+  const deleteProduct = async (id: string) => {
+    try {
+      await deleteProductDB(id);
+      toast({ title: "Producto eliminado" });
+      await loadData();
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast({ title: "Error", description: "No se pudo eliminar el producto", variant: "destructive" });
+    }
   };
 
   // Raffle handlers
-  const saveRaffle = (raffle: Raffle) => {
-    let updatedRaffle = raffle;
-    if (!raffle.id) {
-      updatedRaffle = {
-        ...raffle,
-        id: Date.now().toString(),
-        numbers: Array.from({ length: 100 }, (_, i) => ({
-          number: i + 1,
-          sold: false
-        }))
-      };
-    }
-    const updated = raffle.id 
-      ? raffles.map(r => r.id === raffle.id ? updatedRaffle : r)
-      : [...raffles, updatedRaffle];
-    setRaffles(updated);
-    saveRaffles(updated);
-    setEditingRaffle(null);
-    toast({ title: "Rifa guardada" });
-  };
-
-  const deleteRaffle = (id: string) => {
-    const updated = raffles.filter(r => r.id !== id);
-    setRaffles(updated);
-    saveRaffles(updated);
-    toast({ title: "Rifa eliminada" });
-  };
-
-  const toggleRaffleNumber = (raffleId: string, number: number, buyerName?: string) => {
-    const updated = raffles.map(r => {
-      if (r.id === raffleId) {
-        return {
-          ...r,
-          numbers: r.numbers.map(n => 
-            n.number === number 
-              ? { ...n, sold: !n.sold, buyerName: n.sold ? undefined : buyerName }
-              : n
-          )
-        };
+  const saveRaffle = async (raffle: Raffle) => {
+    try {
+      if (raffle.id && raffle.id !== "") {
+        await updateRaffle(raffle.id, raffle);
+      } else {
+        const newRaffle = await addRaffle(raffle);
+        if (newRaffle) {
+          await addRaffleNumbers(newRaffle.id, 100);
+        }
       }
-      return r;
-    });
-    setRaffles(updated);
-    saveRaffles(updated);
-    if (showRaffleNumbers) {
-      setShowRaffleNumbers(updated.find(r => r.id === raffleId) || null);
+      toast({ title: "Rifa guardada" });
+      setEditingRaffle(null);
+      await loadData();
+    } catch (error) {
+      console.error('Error saving raffle:', error);
+      toast({ title: "Error", description: "No se pudo guardar la rifa", variant: "destructive" });
+    }
+  };
+
+  const deleteRaffle = async (id: string) => {
+    try {
+      await deleteRaffleDB(id);
+      toast({ title: "Rifa eliminada" });
+      await loadData();
+    } catch (error) {
+      console.error('Error deleting raffle:', error);
+      toast({ title: "Error", description: "No se pudo eliminar la rifa", variant: "destructive" });
+    }
+  };
+
+  const toggleRaffleNumber = async (raffleId: string, number: number, buyerName?: string) => {
+    try {
+      const raffle = raffles.find(r => r.id === raffleId);
+      if (!raffle) return;
+
+      const raffleNum = raffle.numbers.find(n => n.number === number);
+      if (!raffleNum) return;
+
+      const newSoldStatus = !raffleNum.sold;
+      await updateRaffleNumber(raffleId, number, newSoldStatus, newSoldStatus ? (buyerName || raffleNum.buyerName) : undefined);
+      
+      toast({ title: newSoldStatus ? "Número marcado como vendido" : "Número marcado como disponible" });
+      await loadData();
+      
+      if (showRaffleNumbers) {
+        const updated = raffles.find(r => r.id === raffleId);
+        if (updated) setShowRaffleNumbers(updated);
+      }
+    } catch (error) {
+      console.error('Error updating raffle number:', error);
+      toast({ title: "Error", description: "No se pudo actualizar el número", variant: "destructive" });
     }
   };
 
   // Giveaway handlers
-  const saveGiveaway = (giveaway: Giveaway) => {
-    const updated = giveaway.id 
-      ? giveaways.map(g => g.id === giveaway.id ? giveaway : g)
-      : [...giveaways, { ...giveaway, id: Date.now().toString() }];
-    setGiveaways(updated);
-    saveGiveaways(updated);
-    setEditingGiveaway(null);
-    toast({ title: "Sorteo guardado" });
+  const saveGiveaway = async (giveaway: Giveaway) => {
+    try {
+      if (giveaway.id && giveaway.id !== "") {
+        await updateGiveaway(giveaway.id, giveaway);
+      } else {
+        await addGiveaway(giveaway);
+      }
+      toast({ title: "Sorteo guardado" });
+      setEditingGiveaway(null);
+      await loadData();
+    } catch (error) {
+      console.error('Error saving giveaway:', error);
+      toast({ title: "Error", description: "No se pudo guardar el sorteo", variant: "destructive" });
+    }
   };
 
-  const deleteGiveaway = (id: string) => {
-    const updated = giveaways.filter(g => g.id !== id);
-    setGiveaways(updated);
-    saveGiveaways(updated);
-    toast({ title: "Sorteo eliminado" });
+  const deleteGiveaway = async (id: string) => {
+    try {
+      await deleteGiveawayDB(id);
+      toast({ title: "Sorteo eliminado" });
+      await loadData();
+    } catch (error) {
+      console.error('Error deleting giveaway:', error);
+      toast({ title: "Error", description: "No se pudo eliminar el sorteo", variant: "destructive" });
+    }
   };
 
   return (
@@ -155,150 +213,156 @@ const AdminDashboard = () => {
       <header className="bg-card border-b border-border sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <span className="text-5xl font-bold text-gradient tracking-wider  font-jomhuria text-gradient
-              transition-all
-              duration-300
-              group-hover:scale-105
-              group-hover:text-transparent
-              group-hover:bg-clip-text
-              group-hover:bg-gradient-to-r
-              group-hover:from-morfika-purple
-              group-hover:to-morfika-glow">MORFIKA Admin</span>
+            <span className="text-5xl font-bold text-gradient tracking-wider font-jomhuria">MORFIKA Admin</span>
           </div>
-          <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground">
-            <LogOut className="w-4 h-4 mr-2" />
-            Cerrar Sesión
-          </Button>
+          <div className="flex items-center gap-4">
+            {instagramFollowers > 0 && (
+              <div className="text-sm">
+                <p className="text-muted-foreground">@dmorfika</p>
+                <p className="text-lg font-semibold text-morfika-glow">{instagramFollowers.toLocaleString()} seguidores</p>
+              </div>
+            )}
+            <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground">
+              <LogOut className="w-4 h-4 mr-2" />
+              Cerrar Sesión
+            </Button>
+          </div>
         </div>
       </header>
 
       {/* Content */}
       <main className="container mx-auto px-6 py-8">
-        <Tabs defaultValue="products" className="space-y-8">
-          <TabsList className="bg-card border border-border">
-            <TabsTrigger value="products" className="data-[state=active]:bg-morfika-purple/20">
-              <Package className="w-4 h-4 mr-2" />
-              Productos
-            </TabsTrigger>
-            <TabsTrigger value="raffles" className="data-[state=active]:bg-morfika-purple/20">
-              <Ticket className="w-4 h-4 mr-2" />
-              Rifas
-            </TabsTrigger>
-            <TabsTrigger value="giveaways" className="data-[state=active]:bg-morfika-purple/20">
-              <Gift className="w-4 h-4 mr-2" />
-              Sorteos
-            </TabsTrigger>
-          </TabsList>
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Cargando datos...</p>
+          </div>
+        ) : (
+          <Tabs defaultValue="products" className="space-y-8">
+            <TabsList className="bg-card border border-border">
+              <TabsTrigger value="products" className="data-[state=active]:bg-morfika-purple/20">
+                <Package className="w-4 h-4 mr-2" />
+                Productos
+              </TabsTrigger>
+              <TabsTrigger value="raffles" className="data-[state=active]:bg-morfika-purple/20">
+                <Ticket className="w-4 h-4 mr-2" />
+                Rifas
+              </TabsTrigger>
+              <TabsTrigger value="giveaways" className="data-[state=active]:bg-morfika-purple/20">
+                <Gift className="w-4 h-4 mr-2" />
+                Sorteos
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Products Tab */}
-          <TabsContent value="products" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-foreground">Productos</h2>
-              <Button 
-                onClick={() => setEditingProduct({ id: "", name: "", description: "", price: 0, image: "/placeholder.svg", category: "" })}
-                className="btn-glow border-0"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Producto
-              </Button>
-            </div>
+            {/* Products Tab */}
+            <TabsContent value="products" className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-foreground">Productos</h2>
+                <Button 
+                  onClick={() => setEditingProduct({ id: "", name: "", description: "", price: 0, image: "/placeholder.svg", category: "" })}
+                  className="btn-glow border-0"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Producto
+                </Button>
+              </div>
 
-            <div className="grid gap-4">
-              {products.map(product => (
-                <div key={product.id} className="bg-card p-4 rounded-xl border border-border flex items-center gap-4">
-                  <img src={product.image} alt={product.name} className="w-16 h-16 rounded-lg object-cover bg-muted" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-foreground">{product.name}</h3>
-                    <p className="text-sm text-muted-foreground">{product.category} - ${product.price.toLocaleString()}</p>
+              <div className="grid gap-4">
+                {products.map(product => (
+                  <div key={product.id} className="bg-card p-4 rounded-xl border border-border flex items-center gap-4">
+                    <img src={product.image} alt={product.name} className="w-16 h-16 rounded-lg object-cover bg-muted" />
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">{product.name}</h3>
+                      <p className="text-sm text-muted-foreground">{product.category} - ${product.price.toLocaleString()}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => setEditingProduct(product)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteProduct(product.id)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => setEditingProduct(product)}>
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => deleteProduct(product.id)}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
+                ))}
+              </div>
+            </TabsContent>
 
-          {/* Raffles Tab */}
-          <TabsContent value="raffles" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-foreground">Rifas</h2>
-              <Button 
-                onClick={() => setEditingRaffle({ id: "", title: "", description: "", image: "/placeholder.svg", price: 0, endDate: "", numbers: [] })}
-                className="btn-glow border-0"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nueva Rifa
-              </Button>
-            </div>
+            {/* Raffles Tab */}
+            <TabsContent value="raffles" className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-foreground">Rifas</h2>
+                <Button 
+                  onClick={() => setEditingRaffle({ id: "", title: "", description: "", image: "/placeholder.svg", price: 0, endDate: "", numbers: [] })}
+                  className="btn-glow border-0"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nueva Rifa
+                </Button>
+              </div>
 
-            <div className="grid gap-4">
-              {raffles.map(raffle => (
-                <div key={raffle.id} className="bg-card p-4 rounded-xl border border-border flex items-center gap-4">
-                  <img src={raffle.image} alt={raffle.title} className="w-16 h-16 rounded-lg object-cover bg-muted" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-foreground">{raffle.title}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      ${raffle.price.toLocaleString()} - {raffle.numbers.filter(n => n.sold).length}/100 vendidos
-                    </p>
+              <div className="grid gap-4">
+                {raffles.map(raffle => (
+                  <div key={raffle.id} className="bg-card p-4 rounded-xl border border-border flex items-center gap-4">
+                    <img src={raffle.image} alt={raffle.title} className="w-16 h-16 rounded-lg object-cover bg-muted" />
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">{raffle.title}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        ${raffle.price.toLocaleString()} - {raffle.numbers.filter(n => n.sold).length}/{raffle.numbers.length} vendidos
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setShowRaffleNumbers(raffle)}>
+                        Ver Números
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => setEditingRaffle(raffle)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteRaffle(raffle.id)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setShowRaffleNumbers(raffle)}>
-                      Ver Números
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setEditingRaffle(raffle)}>
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => deleteRaffle(raffle.id)}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
+                ))}
+              </div>
+            </TabsContent>
 
-          {/* Giveaways Tab */}
-          <TabsContent value="giveaways" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-foreground">Sorteos</h2>
-              <Button 
-                onClick={() => setEditingGiveaway({ id: "", title: "", description: "", image: "/placeholder.svg", instagramRequired: true, currentFollowers: 0, targetFollowers: 1000, endDate: "", active: true })}
-                className="btn-glow border-0"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Sorteo
-              </Button>
-            </div>
+            {/* Giveaways Tab */}
+            <TabsContent value="giveaways" className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-foreground">Sorteos</h2>
+                <Button 
+                  onClick={() => setEditingGiveaway({ id: "", title: "", description: "", image: "/placeholder.svg", instagramRequired: true, currentFollowers: instagramFollowers, targetFollowers: 1000, endDate: "", active: true })}
+                  className="btn-glow border-0"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Sorteo
+                </Button>
+              </div>
 
-            <div className="grid gap-4">
-              {giveaways.map(giveaway => (
-                <div key={giveaway.id} className="bg-card p-4 rounded-xl border border-border flex items-center gap-4">
-                  <img src={giveaway.image} alt={giveaway.title} className="w-16 h-16 rounded-lg object-cover bg-muted" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-foreground">{giveaway.title}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {giveaway.currentFollowers}/{giveaway.targetFollowers} seguidores
-                    </p>
+              <div className="grid gap-4">
+                {giveaways.map(giveaway => (
+                  <div key={giveaway.id} className="bg-card p-4 rounded-xl border border-border flex items-center gap-4">
+                    <img src={giveaway.image} alt={giveaway.title} className="w-16 h-16 rounded-lg object-cover bg-muted" />
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">{giveaway.title}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {instagramFollowers || giveaway.currentFollowers}/{giveaway.targetFollowers} seguidores
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => setEditingGiveaway(giveaway)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteGiveaway(giveaway.id)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => setEditingGiveaway(giveaway)}>
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => deleteGiveaway(giveaway.id)}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
+                ))}
+              </div>
+            </TabsContent>
+          </Tabs>
+        )}
       </main>
 
       {/* Edit Product Modal */}

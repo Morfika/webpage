@@ -1,5 +1,7 @@
-// Mock data storage using localStorage
+import { supabase } from './supabase';
+import { login as authLogin, checkAuth as authCheckAuth, logout as authLogout } from './auth';
 
+// ============ INTERFACES ============
 export interface Product {
   id: string;
   name: string;

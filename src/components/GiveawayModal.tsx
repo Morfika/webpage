@@ -4,11 +4,14 @@ import { type Giveaway } from "@/lib/data";
 interface GiveawayModalProps {
   giveaway: Giveaway;
   onClose: () => void;
+  instagramFollowers?: number;
 }
 
-const GiveawayModal = ({ giveaway, onClose }: GiveawayModalProps) => {
-  const progress = (giveaway.currentFollowers / giveaway.targetFollowers) * 100;
-  const isReady = giveaway.currentFollowers >= giveaway.targetFollowers;
+const GiveawayModal = ({ giveaway, onClose, instagramFollowers = 0 }: GiveawayModalProps) => {
+  // Usar followers de Instagram si están disponibles, si no usar los almacenados
+  const currentFollowers = instagramFollowers > 0 ? instagramFollowers : giveaway.currentFollowers;
+  const progress = (currentFollowers / giveaway.targetFollowers) * 100;
+  const isReady = currentFollowers >= giveaway.targetFollowers;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm" onClick={onClose}>
@@ -57,7 +60,7 @@ const GiveawayModal = ({ giveaway, onClose }: GiveawayModalProps) => {
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-muted-foreground">Progreso</span>
                 <span className="text-foreground font-medium">
-                  {giveaway.currentFollowers}/{giveaway.targetFollowers}
+                  {currentFollowers}/{giveaway.targetFollowers}
                 </span>
               </div>
               <div className="h-3 bg-muted rounded-full overflow-hidden">
@@ -71,7 +74,7 @@ const GiveawayModal = ({ giveaway, onClose }: GiveawayModalProps) => {
             <p className="text-sm text-muted-foreground mt-3">
               {isReady 
                 ? "El sorteo se realizará próximamente entre los participantes."
-                : `Faltan ${giveaway.targetFollowers - giveaway.currentFollowers} seguidores para activar el sorteo.`
+                : `Faltan ${giveaway.targetFollowers - currentFollowers} seguidores para activar el sorteo.`
               }
             </p>
           </div>

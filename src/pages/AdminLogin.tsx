@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock, Printer } from "lucide-react";
 import { login, checkAuth } from "@/lib/data";
@@ -13,10 +13,11 @@ const AdminLogin = () => {
   const { toast } = useToast();
 
   // Check if already logged in
-  if (checkAuth()) {
-    navigate("/admin/dashboard");
-    return null;
-  }
+  useEffect(() => {
+    if (checkAuth()) {
+      navigate("/admin/dashboard");
+    }
+  }, [navigate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
