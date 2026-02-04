@@ -500,7 +500,7 @@ const AdminDashboard = () => {
         <Modal onClose={() => setShowRaffleNumbers(null)} wide>
           <h3 className="text-xl font-bold mb-4">Números: {showRaffleNumbers.title}</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Haz clic en un número para marcarlo como vendido/disponible
+            ✅ Verde = Disponible | ❌ Rojo = Vendido (haz click para cancelar compra)
           </p>
           <div className="grid grid-cols-10 gap-2 max-h-[60vh] overflow-y-auto">
             {showRaffleNumbers.numbers.map((num) => (
@@ -513,15 +513,20 @@ const AdminDashboard = () => {
                       toggleRaffleNumber(showRaffleNumbers.id, num.number, buyerName);
                     }
                   } else {
-                    toggleRaffleNumber(showRaffleNumbers.id, num.number);
+                    const confirmCancel = confirm(
+                      `¿Cancelar venta de #${num.number}?\n\nComprador: ${num.buyerName || "No especificado"}`
+                    );
+                    if (confirmCancel) {
+                      toggleRaffleNumber(showRaffleNumbers.id, num.number);
+                    }
                   }
                 }}
-                className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs font-medium transition-all ${
+                className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs font-medium transition-all cursor-pointer ${
                   num.sold
-                    ? "bg-destructive/20 text-destructive border border-destructive/30"
+                    ? "bg-destructive/20 text-destructive border border-destructive/30 hover:bg-destructive/30"
                     : "bg-morfika-purple/20 text-morfika-glow border border-morfika-purple/30 hover:bg-morfika-purple/40"
                 }`}
-                title={num.sold ? `Vendido a: ${num.buyerName}` : "Disponible"}
+                title={num.sold ? `Vendido a: ${num.buyerName || "Desconocido"}` : "Disponible"}
               >
                 {num.number}
               </button>
