@@ -1,0 +1,216 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Jomhuria&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&family=Jomhuria&family=Junge&display=swap');
+
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* MORFIKA Brand Colors - Galaxy Theme */
+    --background: 252 30% 8%;
+    --foreground: 0 0% 98%;
+
+    --card: 252 35% 12%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 252 35% 10%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 243 45% 37%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 260 40% 18%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 252 25% 16%;
+    --muted-foreground: 252 15% 65%;
+
+    --accent: 270 60% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 252 30% 20%;
+    --input: 252 30% 18%;
+    --ring: 243 45% 50%;
+
+    --radius: 0.75rem;
+
+    /* MORFIKA Custom Colors */
+    --morfika-deep: 260 50% 18%;
+    --morfika-purple: 243 45% 37%;
+    --morfika-blue: 236 30% 45%;
+    --morfika-glow: 270 80% 65%;
+    --morfika-pink: 300 60% 60%;
+    
+    /* Gradients */
+    --gradient-galaxy: linear-gradient(135deg, hsl(260 50% 18%) 0%, hsl(243 45% 25%) 50%, hsl(236 30% 35%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(260 50% 12%) 0%, hsl(252 30% 8%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(252 35% 14%) 0%, hsl(252 35% 10%) 100%);
+    --gradient-glow: linear-gradient(135deg, hsl(270 80% 65% / 0.3) 0%, hsl(300 60% 60% / 0.2) 100%);
+    --gradient-button: linear-gradient(135deg, hsl(243 45% 42%) 0%, hsl(270 60% 50%) 100%);
+    --gradient-button-hover: linear-gradient(135deg, hsl(243 45% 50%) 0%, hsl(270 60% 58%) 100%);
+    
+    /* Shadows */
+    --shadow-glow: 0 0 30px hsl(270 80% 65% / 0.3);
+    --shadow-card: 0 8px 32px hsl(260 50% 10% / 0.5);
+    --shadow-button: 0 4px 20px hsl(270 60% 50% / 0.4);
+
+    /* Sidebar */
+    --sidebar-background: 252 35% 10%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 243 45% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 252 30% 18%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 252 30% 20%;
+    --sidebar-ring: 243 45% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-montserrat antialiased;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  .galaxy-bg {
+    background: var(--gradient-galaxy);
+    position: relative;
+  }
+
+  .galaxy-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: 
+      radial-gradient(2px 2px at 20px 30px, hsl(0 0% 100% / 0.4), transparent),
+      radial-gradient(2px 2px at 40px 70px, hsl(270 80% 70% / 0.3), transparent),
+      radial-gradient(1px 1px at 90px 40px, hsl(0 0% 100% / 0.3), transparent),
+      radial-gradient(2px 2px at 130px 80px, hsl(300 60% 70% / 0.2), transparent),
+      radial-gradient(1px 1px at 160px 120px, hsl(0 0% 100% / 0.4), transparent);
+    background-size: 200px 200px;
+    animation: twinkle 4s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(270 80% 80%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glow-text {
+    text-shadow: 0 0 20px hsl(270 80% 65% / 0.5), 0 0 40px hsl(270 80% 65% / 0.3);
+  }
+
+  .card-glow {
+    box-shadow: var(--shadow-card);
+    transition: all 0.3s ease;
+  }
+
+  .card-glow:hover {
+    box-shadow: var(--shadow-glow), var(--shadow-card);
+    transform: translateY(-4px);
+  }
+
+  .btn-glow {
+    background: var(--gradient-button);
+    box-shadow: var(--shadow-button);
+    transition: all 0.3s ease;
+  }
+
+  .btn-glow:hover {
+    background: var(--gradient-button-hover);
+    box-shadow: 0 6px 30px hsl(270 60% 50% / 0.5);
+    transform: translateY(-2px);
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+  }
+
+  .animate-pulse-glow {
+    animation: pulseGlow 3s ease-in-out infinite;
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 20px hsl(270 80% 65% / 0.3); }
+    50% { box-shadow: 0 0 40px hsl(270 80% 65% / 0.6); }
+  }
+
+  .number-available {
+    @apply bg-gradient-to-br from-morfika-purple to-morfika-blue text-white cursor-pointer;
+    transition: all 0.2s ease;
+  }
+
+  .number-available:hover {
+    @apply scale-110;
+    box-shadow: var(--shadow-glow);
+  }
+
+  .number-sold {
+    @apply bg-muted text-muted-foreground cursor-not-allowed opacity-50;
+  }
+}
+
+/* ===== Scrollbar MORFIKA Style ===== */
+
+/* Chrome, Edge, Safari */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(252 30% 8%); /* background */
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    hsl(243 45% 45%),
+    hsl(270 80% 65%)
+  );
+  border-radius: 10px;
+  border: 2px solid hsl(252 30% 8%);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    hsl(270 80% 65%),
+    hsl(300 60% 60%)
+  );
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(270 80% 65%) hsl(252 30% 8%);
+}
+
