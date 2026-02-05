@@ -1,4 +1,4 @@
-import { Printer, Instagram, MessageCircle } from "lucide-react";
+import { Instagram, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Footer = () => {
@@ -9,7 +9,7 @@ const Footer = () => {
           {/* Brand */}
           <div className="space-y-4">
             <Link to="/" className="flex items-center gap-3">
-              <Printer className="w-7 h-7 text-morfika-glow" />
+              <img src="/morfika.svg" alt="MORFIKA" className="w-7 h-7" />
               <span className="text-xl font-bold text-gradient">MORFIKA</span>
             </Link>
             <p className="text-muted-foreground text-sm leading-relaxed">

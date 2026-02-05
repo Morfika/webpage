@@ -451,10 +451,14 @@ const defaultPrinters: Printer[] = [
 
 
 const defaultGallery: GalleryItem[] = [
-  { id: "1", image: "/src/assets/gallery-1.jpg", title: "Figuras Anime", description: "Colección de figuras anime" },
-  { id: "2", image: "/src/assets/gallery-2.jpg", title: "Piezas Mecánicas", description: "Prototipado industrial" },
-  { id: "3", image: "/src/assets/hero-3d-print.jpg", title: "Arte Decorativo", description: "Esculturas y arte" },
-  { id: "4", image: "/src/assets/printer-1.jpg", title: "Accesorios Gaming", description: "Para tu setup" }
+  { id: "1", image: "/src/assets/gallery-1.png", title: "Calavera Voronoi", description: "Impresión artística con estilo Voronoi" },
+  { id: "2", image: "/src/assets/gallery-2.png", title: "Torre Eiffel", description: "Réplica arquitectónica de precisión detallada" },
+  { id: "3", image: "/src/assets/gallery-3.png", title: "Gato Decorativo", description: "Gato artístico y decorativo con acabado profesional" },
+  { id: "4", image: "/src/assets/gallery-4.png", title: "Robot Ackerman", description: "Modelo impreso con piezas funcionales ensamblables" },
+  { id: "5", image: "/src/assets/gallery-5.png", title: "Ajedrez Personalizado", description: "Set de ajedrez 3D personalizado con detalles precisos" },
+  { id: "6", image: "/src/assets/gallery-6.png", title: "Conjunto Decorativo Detalle", description: "Cuadro y accesorios personalizados, ideales para obsequios" },
+  { id: "7", image: "/src/assets/gallery-7.png", title: "Gatos B&W con Llaveros", description: "Dos gatos blanco y negro con detalles finos y llaveros personalizados" },
+  { id: "8", image: "/src/assets/gallery-8.png", title: "Toros Personalizados", description: "Figuras de toros impresos con detalles y acabados personalizables" }
 ];
 
 export const getPrinters = (): Printer[] => {
