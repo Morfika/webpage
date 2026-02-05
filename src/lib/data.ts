@@ -402,7 +402,7 @@ const defaultPrinters: Printer[] = [
   {
     id: "1",
     name: "Creality Ender 3 V3 KE",
-    image: "/src/assets/ender3v3ke.png",
+    image: "/assets/ender3v3ke.png",
     materials: ["PLA", "PETG", "TPU"],
     dimensions: "220 x 220 x 240 mm",
     description: "Impresora FDM rápida con extrusor directo, nivelación automática CR-Touch y firmware Klipper"
@@ -410,7 +410,7 @@ const defaultPrinters: Printer[] = [
   {
     id: "2",
     name: "Anycubic Kobra 2 Max",
-    image: "/src/assets/anycubickobra2max.png",
+    image: "/assets/anycubickobra2max.png",
     materials: ["PLA", "ABS", "PETG", "TPU", "Nylon"],
     dimensions: "420 x 420 x 500 mm",
     description: "Impresora FDM de gran formato con sistema LeviQ 2.0, alta velocidad y cama magnética PEI"
@@ -418,7 +418,7 @@ const defaultPrinters: Printer[] = [
   {
     id: "3",
     name: "Creality CR-10 SE",
-    image: "/src/assets/cr10se.png",
+    image: "/assets/cr10se.png",
     materials: ["PLA", "PETG", "TPU", "ABS", "Nylon"],
     dimensions: "300 x 300 x 400 mm",
     description: "Impresora FDM con extrusor directo Sprite, nivelación automática y alto rendimiento para piezas grandes"
@@ -426,7 +426,7 @@ const defaultPrinters: Printer[] = [
   {
     id: "4",
     name: "Anycubic Photon Mono X2",
-    image: "/src/assets/photonmonox2.png",
+    image: "/assets/photonmonox2.png",
     materials: ["Resina estándar", "Resina ABS-like", "Resina flexible", "Resina lavable en agua"],
     dimensions: "196 x 122 x 200 mm",
     description: "Impresora 3D de resina con pantalla monocromática 4K, alta precisión y excelente detalle en miniaturas"
@@ -434,7 +434,7 @@ const defaultPrinters: Printer[] = [
   {
     id: "5",
     name: "Bambu Lab A1 Combo",
-    image: "/src/assets/A1combo.png",
+    image: "/assets/A1combo.png",
     materials: ["PLA", "PETG", "TPU", "ABS", "ASA", "Nylon"],
     dimensions: "256 x 256 x 256 mm",
     description: "Impresora FDM de alta velocidad con sistema AMS Lite para impresión multicolor, nivelación automática y excelente calidad desde fábrica"
@@ -442,7 +442,7 @@ const defaultPrinters: Printer[] = [
   {
     id: "6",
     name: "Elegoo Centauri Carbon",
-    image: "/src/assets/centauricarbon.png",
+    image: "/assets/centauricarbon.png",
     materials: ["PLA", "PETG", "TPU", "ABS", "ASA", "Nylon", "Fibra de carbono"],
     dimensions: "320 x 320 x 400 mm",
     description: "Impresora FDM de gran formato con estructura reforzada, hotend de alta temperatura y compatibilidad con filamentos técnicos"
@@ -451,14 +451,14 @@ const defaultPrinters: Printer[] = [
 
 
 const defaultGallery: GalleryItem[] = [
-  { id: "1", image: "/src/assets/gallery-1.png", title: "Calavera Voronoi", description: "Impresión artística con estilo Voronoi" },
-  { id: "2", image: "/src/assets/gallery-2.png", title: "Torre Eiffel", description: "Réplica arquitectónica de precisión detallada" },
-  { id: "3", image: "/src/assets/gallery-3.png", title: "Gato Decorativo", description: "Gato artístico y decorativo con acabado profesional" },
-  { id: "4", image: "/src/assets/gallery-4.png", title: "Robot Ackerman", description: "Modelo impreso con piezas funcionales ensamblables" },
-  { id: "5", image: "/src/assets/gallery-5.png", title: "Ajedrez Personalizado", description: "Set de ajedrez 3D personalizado con detalles precisos" },
-  { id: "6", image: "/src/assets/gallery-6.png", title: "Conjunto Decorativo Detalle", description: "Cuadro y accesorios personalizados, ideales para obsequios" },
-  { id: "7", image: "/src/assets/gallery-7.png", title: "Gatos B&W con Llaveros", description: "Dos gatos blanco y negro con detalles finos y llaveros personalizados" },
-  { id: "8", image: "/src/assets/gallery-8.png", title: "Toros Personalizados", description: "Figuras de toros impresos con detalles y acabados personalizables" }
+  { id: "1", image: "/assets/gallery-1.png", title: "Calavera Voronoi", description: "Impresión artística con estilo Voronoi" },
+  { id: "2", image: "/assets/gallery-2.png", title: "Torre Eiffel", description: "Réplica arquitectónica de precisión detallada" },
+  { id: "3", image: "/assets/gallery-3.png", title: "Gato Decorativo", description: "Gato artístico y decorativo con acabado profesional" },
+  { id: "4", image: "/assets/gallery-4.png", title: "Robot Ackerman", description: "Modelo impreso con piezas funcionales ensamblables" },
+  { id: "5", image: "/assets/gallery-5.png", title: "Ajedrez Personalizado", description: "Set de ajedrez 3D personalizado con detalles precisos" },
+  { id: "6", image: "/assets/gallery-6.png", title: "Conjunto Decorativo Detalle", description: "Cuadro y accesorios personalizados, ideales para obsequios" },
+  { id: "7", image: "/assets/gallery-7.png", title: "Gatos B&W con Llaveros", description: "Dos gatos blanco y negro con detalles finos y llaveros personalizados" },
+  { id: "8", image: "/assets/gallery-8.png", title: "Toros Personalizados", description: "Figuras de toros impresos con detalles y acabados personalizables" }
 ];
 
 export const getPrinters = (): Printer[] => {
