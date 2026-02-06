@@ -175,7 +175,7 @@
   }
 
   .number-sold {
-    @apply bg-muted text-muted-foreground cursor-not-allowed opacity-50;
+    @apply bg-muted text-muted-foreground opacity-50;
   }
 }
 
