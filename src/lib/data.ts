@@ -1,6 +1,18 @@
 import { supabase } from './supabase';
 import { login as authLogin, checkAuth as authCheckAuth, logout as authLogout } from './auth';
 
+// ============ UTILITY FUNCTIONS ============
+/**
+ * Genera un código único de 4 dígitos para un número de boleta vendido
+ * Formato: XX.YY donde XX = número con padding (00-99) e YY = aleatorio (00-99)
+ * Ejemplo: número 7 con aleatorio 23 = "0723"
+ */
+export const generateBuyerCode = (number: number): string => {
+  const paddedNumber = String(number).padStart(2, '0');
+  const randomPart = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+  return `${paddedNumber}${randomPart}`;
+};
+
 // ============ INTERFACES ============
 export interface Product {
   id: string;
@@ -24,8 +36,10 @@ export interface Raffle {
 export interface RaffleNumber {
   number: number;
   sold: boolean;
+  paid?: boolean;
   buyerName?: string;
   buyerPhone?: string;
+  buyerCode?: string;
 }
 
 export interface Giveaway {
@@ -124,6 +138,42 @@ export const saveProducts = async (products: Product[]) => {
   return true;
 };
 
+// ============ BUYER CODE FUNCTIONS ============
+/**
+ * Obtiene todos los códigos existentes de una rifa para evitar duplicados
+ */
+const getExistingCodes = async (raffleId: string): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('raffle_numbers')
+      .select('buyer_code')
+      .eq('raffle_id', raffleId)
+      .not('buyer_code', 'is', null);
+
+    if (error) throw error;
+    return data?.map(r => r.buyer_code) || [];
+  } catch (error) {
+    console.error('Error getting existing codes:', error);
+    return [];
+  }
+};
+
+/**
+ * Genera un código único que no exista en la rifa
+ */
+export const generateUniqueBuyerCode = async (raffleId: string, number: number): Promise<string> => {
+  const existingCodes = await getExistingCodes(raffleId);
+  const paddedNumber = String(number).padStart(2, '0');
+  
+  let newCode = generateBuyerCode(number);
+  // Si el código ya existe, intenta generar otro
+  while (existingCodes.includes(newCode)) {
+    newCode = `${paddedNumber}${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
+  }
+  
+  return newCode;
+};
+
 // ============ RIFAS ============
 export const getRaffles = async (): Promise<Raffle[]> => {
   try {
@@ -155,8 +205,10 @@ export const getRaffles = async (): Promise<Raffle[]> => {
         numbers: numbersData?.map(n => ({
           number: n.number,
           sold: n.sold,
+          paid: n.paid,
           buyerName: n.buyer_name,
-          buyerPhone: n.buyer_phone
+          buyerPhone: n.buyer_phone,
+          buyerCode: n.buyer_code
         })) || []
       });
     }
@@ -223,8 +275,10 @@ export const updateRaffle = async (id: string, updates: Partial<Raffle>): Promis
       numbers: numbersData?.map(n => ({
         number: n.number,
         sold: n.sold,
+        paid: n.paid,
         buyerName: n.buyer_name,
-        buyerPhone: n.buyer_phone
+        buyerPhone: n.buyer_phone,
+        buyerCode: n.buyer_code
       })) || []
     };
   } catch (error) {
@@ -248,14 +302,16 @@ export const deleteRaffle = async (id: string): Promise<boolean> => {
   }
 };
 
-export const updateRaffleNumber = async (raffleId: string, number: number, sold: boolean, buyerName?: string, buyerPhone?: string): Promise<boolean> => {
+export const updateRaffleNumber = async (raffleId: string, number: number, sold: boolean, buyerName?: string, buyerPhone?: string, buyerCode?: string, paid?: boolean): Promise<boolean> => {
   try {
     const { error } = await supabase
       .from('raffle_numbers')
       .update({
         sold,
+        paid,
         buyer_name: buyerName,
-        buyer_phone: buyerPhone
+        buyer_phone: buyerPhone,
+        buyer_code: buyerCode
       })
       .eq('raffle_id', raffleId)
       .eq('number', number);

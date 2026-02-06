@@ -13,6 +13,7 @@ import {
   deleteRaffle as deleteRaffleDB,
   updateRaffleNumber,
   addRaffleNumbers,
+  generateUniqueBuyerCode,
   getGiveaways,
   addGiveaway,
   updateGiveaway,
@@ -184,7 +185,7 @@ const AdminDashboard = () => {
     }
   };
 
-  const toggleRaffleNumber = async (raffleId: string, number: number, buyerName?: string, buyerPhone?: string) => {
+  const toggleRaffleNumber = async (raffleId: string, number: number, buyerName?: string, buyerPhone?: string, paid: boolean = false) => {
     try {
       const raffle = raffles.find(r => r.id === raffleId);
       if (!raffle) return;
@@ -193,9 +194,23 @@ const AdminDashboard = () => {
       if (!raffleNum) return;
 
       const newSoldStatus = !raffleNum.sold;
-      await updateRaffleNumber(raffleId, number, newSoldStatus, newSoldStatus ? (buyerName || raffleNum.buyerName) : undefined, newSoldStatus ? (buyerPhone || raffleNum.buyerPhone) : undefined);
       
-      toast({ title: newSoldStatus ? "Número marcado como vendido" : "Número marcado como disponible" });
+      let buyerCode: string | undefined;
+      if (newSoldStatus && (buyerName || buyerPhone)) {
+        // Generar código único cuando se registra una venta
+        buyerCode = await generateUniqueBuyerCode(raffleId, number);
+      }
+      
+      await updateRaffleNumber(raffleId, number, newSoldStatus, newSoldStatus ? (buyerName || raffleNum.buyerName) : undefined, newSoldStatus ? (buyerPhone || raffleNum.buyerPhone) : undefined, buyerCode || raffleNum.buyerCode, newSoldStatus ? paid : undefined);
+      
+      // Mostrar el código al usuario si se generó uno
+      if (buyerCode) {
+        const statusText = paid ? "pagada" : "apartada";
+        toast({ title: "¡Venta registrada!", description: `Código: ${buyerCode} (${statusText})`, variant: "default" });
+      } else {
+        toast({ title: newSoldStatus ? "Número marcado como vendido" : "Número marcado como disponible" });
+      }
+      
       await loadData();
       
       if (showRaffleNumbers) {
@@ -205,6 +220,29 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error updating raffle number:', error);
       toast({ title: "Error", description: "No se pudo actualizar el número", variant: "destructive" });
+    }
+  };
+
+  const togglePaidStatus = async (raffleId: string, number: number, currentPaid: boolean) => {
+    try {
+      const raffle = raffles.find(r => r.id === raffleId);
+      if (!raffle) return;
+
+      const raffleNum = raffle.numbers.find(n => n.number === number);
+      if (!raffleNum) return;
+
+      await updateRaffleNumber(raffleId, number, true, raffleNum.buyerName, raffleNum.buyerPhone, raffleNum.buyerCode, !currentPaid);
+      
+      toast({ title: !currentPaid ? "✓ Marcado como pagado" : "Marcado como no pagado" });
+      await loadData();
+      
+      if (showRaffleNumbers) {
+        const updated = raffles.find(r => r.id === raffleId);
+        if (updated) setShowRaffleNumbers(updated);
+      }
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      toast({ title: "Error", description: "No se pudo actualizar el estado", variant: "destructive" });
     }
   };
 
@@ -594,8 +632,12 @@ const AdminDashboard = () => {
                 <span className="text-sm text-foreground">Disponible</span>
               </div>
               <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded bg-yellow-500/20 border border-yellow-500/30" />
+                <span className="text-sm text-foreground">Apartada (sin pagar)</span>
+              </div>
+              <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded bg-destructive/20 border border-destructive/30" />
-                <span className="text-sm text-foreground">Vendido (click para cancelar)</span>
+                <span className="text-sm text-foreground">Pagada</span>
               </div>
             </div>
           </div>
@@ -606,28 +648,47 @@ const AdminDashboard = () => {
                 key={num.number}
                 onClick={() => {
                   if (!num.sold) {
+                    // Disponible: pedir datos para apartar
                     const buyerName = prompt("Nombre del comprador:");
                     if (buyerName) {
                       const buyerPhone = prompt("Teléfono del comprador:");
                       if (buyerPhone) {
-                        toggleRaffleNumber(showRaffleNumbers.id, num.number, buyerName, buyerPhone);
+                        toggleRaffleNumber(showRaffleNumbers.id, num.number, buyerName, buyerPhone, false);
+                      }
+                    }
+                  } else if (num.sold && !num.paid) {
+                    // Apartada: opciones de pagar o cancelar
+                    const action = prompt(`#${num.number} - ${num.buyerName}\n\nEscribe:\n"p" para marcar como PAGADO\n"c" para CANCELAR venta`);
+                    if (action?.toLowerCase() === 'p') {
+                      togglePaidStatus(showRaffleNumbers.id, num.number, false);
+                    } else if (action?.toLowerCase() === 'c') {
+                      const confirm = window.confirm(`¿Cancelar venta de #${num.number}?`);
+                      if (confirm) {
+                        toggleRaffleNumber(showRaffleNumbers.id, num.number);
                       }
                     }
                   } else {
-                    const confirmCancel = confirm(
-                      `¿Cancelar venta de #${num.number}?\n\nComprador: ${num.buyerName || "No especificado"}\nTeléfono: ${num.buyerPhone || "No especificado"}`
-                    );
-                    if (confirmCancel) {
+                    // Pagada: opción de cancelar
+                    const confirm = window.confirm(`¿Cancelar venta de #${num.number}?\nComprador: ${num.buyerName}`);
+                    if (confirm) {
                       toggleRaffleNumber(showRaffleNumbers.id, num.number);
                     }
                   }
                 }}
                 className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs font-medium transition-all cursor-pointer ${
-                  num.sold
+                  !num.sold
+                    ? "bg-morfika-purple/20 text-morfika-glow border border-morfika-purple/30 hover:bg-morfika-purple/40"
+                    : num.paid
                     ? "bg-destructive/20 text-destructive border border-destructive/30 hover:bg-destructive/30"
-                    : "bg-morfika-purple/20 text-morfika-glow border border-morfika-purple/30 hover:bg-morfika-purple/40"
+                    : "bg-yellow-500/20 text-yellow-600 border border-yellow-500/30 hover:bg-yellow-500/30"
                 }`}
-                title={num.sold ? `Vendido a: ${num.buyerName || "Desconocido"}\nTeléfono: ${num.buyerPhone || "No especificado"}` : "Disponible"}
+                title={
+                  !num.sold 
+                    ? "Disponible" 
+                    : num.paid
+                    ? `Pagada\nComprador: ${num.buyerName}\nTeléfono: ${num.buyerPhone}\nCódigo: ${num.buyerCode}`
+                    : `Apartada\nComprador: ${num.buyerName}\nTeléfono: ${num.buyerPhone}\nCódigo: ${num.buyerCode}`
+                }
               >
                 {num.number}
               </button>
