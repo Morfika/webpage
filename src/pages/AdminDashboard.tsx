@@ -184,7 +184,7 @@ const AdminDashboard = () => {
     }
   };
 
-  const toggleRaffleNumber = async (raffleId: string, number: number, buyerName?: string) => {
+  const toggleRaffleNumber = async (raffleId: string, number: number, buyerName?: string, buyerPhone?: string) => {
     try {
       const raffle = raffles.find(r => r.id === raffleId);
       if (!raffle) return;
@@ -193,7 +193,7 @@ const AdminDashboard = () => {
       if (!raffleNum) return;
 
       const newSoldStatus = !raffleNum.sold;
-      await updateRaffleNumber(raffleId, number, newSoldStatus, newSoldStatus ? (buyerName || raffleNum.buyerName) : undefined);
+      await updateRaffleNumber(raffleId, number, newSoldStatus, newSoldStatus ? (buyerName || raffleNum.buyerName) : undefined, newSoldStatus ? (buyerPhone || raffleNum.buyerPhone) : undefined);
       
       toast({ title: newSoldStatus ? "Número marcado como vendido" : "Número marcado como disponible" });
       await loadData();
@@ -608,11 +608,14 @@ const AdminDashboard = () => {
                   if (!num.sold) {
                     const buyerName = prompt("Nombre del comprador:");
                     if (buyerName) {
-                      toggleRaffleNumber(showRaffleNumbers.id, num.number, buyerName);
+                      const buyerPhone = prompt("Teléfono del comprador:");
+                      if (buyerPhone) {
+                        toggleRaffleNumber(showRaffleNumbers.id, num.number, buyerName, buyerPhone);
+                      }
                     }
                   } else {
                     const confirmCancel = confirm(
-                      `¿Cancelar venta de #${num.number}?\n\nComprador: ${num.buyerName || "No especificado"}`
+                      `¿Cancelar venta de #${num.number}?\n\nComprador: ${num.buyerName || "No especificado"}\nTeléfono: ${num.buyerPhone || "No especificado"}`
                     );
                     if (confirmCancel) {
                       toggleRaffleNumber(showRaffleNumbers.id, num.number);
@@ -624,7 +627,7 @@ const AdminDashboard = () => {
                     ? "bg-destructive/20 text-destructive border border-destructive/30 hover:bg-destructive/30"
                     : "bg-morfika-purple/20 text-morfika-glow border border-morfika-purple/30 hover:bg-morfika-purple/40"
                 }`}
-                title={num.sold ? `Vendido a: ${num.buyerName || "Desconocido"}` : "Disponible"}
+                title={num.sold ? `Vendido a: ${num.buyerName || "Desconocido"}\nTeléfono: ${num.buyerPhone || "No especificado"}` : "Disponible"}
               >
                 {num.number}
               </button>
