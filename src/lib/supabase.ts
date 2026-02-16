@@ -10,7 +10,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // ============ IMAGE UPLOAD ============
-export const uploadImage = async (file: File, folder: 'products' | 'raffles' | 'giveaways'): Promise<string | null> => {
+export const uploadImage = async (file: File, folder: 'products' | 'raffles' | 'giveaways' | 'quotations' | string): Promise<string | null> => {
   try {
     // Generar nombre único para la imagen
     const timestamp = Date.now();

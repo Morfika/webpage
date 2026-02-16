@@ -2,61 +2,17 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Plus, Trash2, Calculator, Cpu, ImagePlus, FileText, X, Save
+  Plus, Trash2, Calculator, Cpu, ImagePlus, FileText, X, Save, Loader
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-
-// Types
-interface PrinterConfig {
-  id: string;
-  name: string;
-  consumoWh: number; // watts per hour
-  costoPorKwh: number; // cost per KWh in COP
-  costoMinuto: number; // costo por minuto de uso ($)
-}
-
-interface PrintPiece {
-  id: string;
-  name: string;
-  image: string;
-  material: string;
-  costo1kg: number;
-  consumoGramos: number;
-  tiempoMinutos: number;
-  printerId: string;
-  // Post-processing
-  primerCosto200ml: number;
-  consumoPrimerGramos: number;
-  costoLijadoPintura: number;
-  tiempoPostprocesado: number; // minutes
-  costoPorHoraPostprocesado: number;
-}
-
-interface Quotation {
-  id: string;
-  clientName: string;
-  pieces: PrintPiece[];
-  createdAt: string;
-}
-
-// Storage
-const getPrinterConfigs = (): PrinterConfig[] => {
-  const stored = localStorage.getItem("morfika_printer_configs");
-  return stored ? JSON.parse(stored) : [];
-};
-const savePrinterConfigs = (configs: PrinterConfig[]) => {
-  localStorage.setItem("morfika_printer_configs", JSON.stringify(configs));
-};
-const getQuotations = (): Quotation[] => {
-  const stored = localStorage.getItem("morfika_quotations");
-  return stored ? JSON.parse(stored) : [];
-};
-const saveQuotations = (q: Quotation[]) => {
-  localStorage.setItem("morfika_quotations", JSON.stringify(q));
-};
+import {
+  getPrintersDB, savePrinterDB, deletePrinterDB,
+  getQuotationsDB, saveQuotationDB, deleteQuotationDB, uploadQuotationImage,
+  type PrinterConfig, type PrintPiece, type Quotation
+} from "@/lib/quotations";
 
 // Calculation helpers
 const calcCostoGramo = (costo1kg: number) => costo1kg / 1000;
@@ -140,18 +96,37 @@ const formatCOP = (n: number) =>
 // ─── Main Component ─────────────────────────────────────────────
 const PrintCostCalculator = () => {
   const { toast } = useToast();
-  const [printers, setPrinters] = useState<PrinterConfig[]>(getPrinterConfigs());
+
+  // States
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [printers, setPrinters] = useState<PrinterConfig[]>([]);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
+
   const [editingPrinter, setEditingPrinter] = useState<PrinterConfig | null>(null);
   const [pieces, setPieces] = useState<PrintPiece[]>([defaultPiece()]);
   const [clientName, setClientName] = useState("");
-  const [quotations, setQuotations] = useState<Quotation[]>(getQuotations());
   const [currentQuotationId, setCurrentQuotationId] = useState<string | null>(null);
   const [showPrinterManager, setShowPrinterManager] = useState(false);
-  const [viewQuotation, setViewQuotation] = useState<Quotation | null>(null);
   const [timeInputMode, setTimeInputMode] = useState<Record<string, "minutes" | "hm">>({});
 
-  useEffect(() => { savePrinterConfigs(printers); }, [printers]);
-  useEffect(() => { saveQuotations(quotations); }, [quotations]);
+  // Load Data
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [pData, qData] = await Promise.all([getPrintersDB(), getQuotationsDB()]);
+      setPrinters(pData);
+      setQuotations(qData);
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error al cargar datos", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getPrinter = (id: string) => printers.find((p) => p.id === id);
 
@@ -180,6 +155,7 @@ const PrintCostCalculator = () => {
   const ventaTotal = pieceCalcs.reduce((s, c) => s + c.costoVenta, 0);
   const descuentoGrupo = pieces.length > 1 ? calcDescuentoGrupo(totalFilamento) : 0;
   const valorVenta = ventaTotal * (1 - descuentoGrupo);
+  // Ganancia neta corregida incluyendo la resta de sobrecosto por fallo
   const gananciaNeta = valorVenta - pieceCalcs.reduce((s, c) => s + (c.costoMaterial + c.costoEnergia + c.costoUsoMaquina + c.sobrecostoFallo), 0);
 
   const updatePiece = (id: string, updates: Partial<PrintPiece>) => {
@@ -189,36 +165,50 @@ const PrintCostCalculator = () => {
   const addPiece = () => setPieces((prev) => [...prev, defaultPiece()]);
   const removePiece = (id: string) => setPieces((prev) => prev.filter((p) => p.id !== id));
 
-  const handleSaveQuotation = () => {
+  const handleSaveQuotation = async () => {
     if (!clientName.trim()) {
       toast({ title: "Ingresa el nombre del cliente", variant: "destructive" });
       return;
     }
 
-    if (currentQuotationId) {
-      // Update existing
-      setQuotations((prev) => prev.map((q) =>
-        q.id === currentQuotationId
-          ? { ...q, clientName, pieces: [...pieces], createdAt: new Date().toISOString() }
-          : q
-      ));
-      toast({ title: "Cotización actualizada" });
-    } else {
-      // Create new
+    try {
+      setUploading(true);
       const q: Quotation = {
-        id: Date.now().toString(),
+        id: currentQuotationId || "",
         clientName,
-        pieces: [...pieces],
+        pieces,
         createdAt: new Date().toISOString(),
       };
-      setQuotations((prev) => [q, ...prev]);
-      toast({ title: "Cotización guardada" });
-    }
 
-    // Reset form
-    setPieces([defaultPiece()]);
-    setClientName("");
-    setCurrentQuotationId(null);
+      const newId = await saveQuotationDB(q, !!currentQuotationId);
+
+      toast({ title: currentQuotationId ? "Cotización actualizada" : "Cotización guardada" });
+
+      // Reload data to get fresh list
+      await loadData();
+
+      // Reset form
+      cancelEditing();
+
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error al guardar la cotización", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteQuotation = async (id: string) => {
+    if (!confirm("¿Eliminar esta cotización?")) return;
+    try {
+      await deleteQuotationDB(id);
+      setQuotations((prev) => prev.filter((q) => q.id !== id));
+      toast({ title: "Cotización eliminada" });
+      if (currentQuotationId === id) cancelEditing();
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error al eliminar", variant: "destructive" });
+    }
   };
 
   const loadQuotation = (q: Quotation) => {
@@ -226,7 +216,6 @@ const PrintCostCalculator = () => {
     setPieces(q.pieces);
     setCurrentQuotationId(q.id);
     toast({ title: "Cotización cargada para editar" });
-    // Scroll to top smoothly
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -236,26 +225,62 @@ const PrintCostCalculator = () => {
     setCurrentQuotationId(null);
   };
 
-  const savePrinterItem = (printer: PrinterConfig) => {
+  const savePrinterItem = async (printer: PrinterConfig) => {
     if (!printer.name.trim()) return;
-    const isNew = !printers.find((p) => p.id === printer.id);
-    if (isNew) {
-      setPrinters((prev) => [...prev, { ...printer, id: Date.now().toString() }]);
-    } else {
-      setPrinters((prev) => prev.map((p) => (p.id === printer.id ? printer : p)));
+    try {
+      setUploading(true);
+      const newId = await savePrinterDB(printer);
+
+      // Update local state optimizing instead of full reload if simplest
+      const isNew = !printer.id || printer.id.length < 10;
+      if (isNew) {
+        setPrinters((prev) => [...prev, { ...printer, id: newId }]);
+      } else {
+        setPrinters((prev) => prev.map((p) => (p.id === printer.id ? { ...printer, id: newId } : p)));
+      }
+
+      setEditingPrinter(null);
+      toast({ title: "Impresora guardada" });
+      await loadData(); // Reload just in case
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error al guardar impresora", variant: "destructive" });
+    } finally {
+      setUploading(false);
     }
-    setEditingPrinter(null);
-    toast({ title: "Impresora guardada" });
   };
 
-  const handleImageUpload = (pieceId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDeletePrinter = async (id: string) => {
+    if (!confirm("¿Eliminar esta impresora?")) return;
+    try {
+      await deletePrinterDB(id);
+      setPrinters((prev) => prev.filter((p) => p.id !== id));
+      toast({ title: "Impresora eliminada" });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error al eliminar impresora", variant: "destructive" });
+    }
+  };
+
+  const handleImageUpload = async (pieceId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      updatePiece(pieceId, { image: reader.result as string });
-    };
-    reader.readAsDataURL(file);
+
+    try {
+      setUploading(true);
+      const publicUrl = await uploadQuotationImage(file);
+      if (publicUrl) {
+        updatePiece(pieceId, { image: publicUrl });
+        toast({ title: "Imagen subida" });
+      } else {
+        toast({ title: "Error al subir imagen", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error al subir imagen", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const getTimeDisplay = (minutes: number) => {
@@ -263,6 +288,10 @@ const PrintCostCalculator = () => {
     const m = minutes % 60;
     return h > 0 ? `${h}h ${m}min` : `${m}min`;
   };
+
+  if (loading) {
+    return <div className="flex justify-center p-8"><Loader className="w-8 h-8 animate-spin text-morfika-glow" /></div>;
+  }
 
   return (
     <div className="space-y-8">
@@ -328,7 +357,7 @@ const PrintCostCalculator = () => {
                 {/* Image upload */}
                 <div className="flex flex-col items-center gap-2">
                   <label className="cursor-pointer group">
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(piece.id, e)} />
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(piece.id, e)} disabled={uploading} />
                     <div className="w-28 h-28 rounded-xl border-2 border-dashed border-border group-hover:border-morfika-glow/50 transition-colors flex items-center justify-center overflow-hidden bg-muted/30">
                       {piece.image ? (
                         <img src={piece.image} alt="" className="w-full h-full object-cover" />
@@ -337,7 +366,7 @@ const PrintCostCalculator = () => {
                       )}
                     </div>
                   </label>
-                  <span className="text-xs text-muted-foreground">Subir foto</span>
+                  <span className="text-xs text-muted-foreground">{uploading ? "Subiendo..." : "Subir foto"}</span>
                 </div>
 
                 {/* Printing fields */}
@@ -507,15 +536,16 @@ const PrintCostCalculator = () => {
 
         <p className="text-xs text-muted-foreground">
           El descuento grupal se aplica sobre el total: MIN(filamento_total_g / 1000 × 10%, 10%). Máximo 10% con 1kg+.
+          Calculos dinámicos.
         </p>
 
         <div className="flex gap-3 justify-end">
-          <Button variant="outline" onClick={cancelEditing}>
+          <Button variant="outline" onClick={cancelEditing} disabled={uploading}>
             {currentQuotationId ? "Cancelar Edición" : "Limpiar"}
           </Button>
-          <Button className="btn-glow border-0" onClick={handleSaveQuotation}>
+          <Button className="btn-glow border-0" onClick={handleSaveQuotation} disabled={uploading}>
             <Save className="w-4 h-4 mr-2" />
-            {currentQuotationId ? "Actualizar Cotización" : "Guardar Cotización"}
+            {(uploading) ? "Guardando..." : (currentQuotationId ? "Actualizar Cotización" : "Guardar Cotización")}
           </Button>
         </div>
       </div>
@@ -550,11 +580,7 @@ const PrintCostCalculator = () => {
                     <Button variant="ghost" size="icon" onClick={() => loadQuotation(q)} title="Ver / Editar">
                       <FileText className="w-4 h-4 text-morfika-glow" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => {
-                      setQuotations((prev) => prev.filter((x) => x.id !== q.id));
-                      toast({ title: "Cotización eliminada" });
-                      if (currentQuotationId === q.id) cancelEditing();
-                    }}>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteQuotation(q.id)}>
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
                   </div>
@@ -584,7 +610,7 @@ const PrintCostCalculator = () => {
                     <p className="text-xs text-muted-foreground">{p.consumoWh}Wh · {formatCOP(p.costoPorKwh)}/kWh · {formatCOP(p.costoMinuto)}/min</p>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => setEditingPrinter(p)}>Editar</Button>
-                  <Button variant="ghost" size="icon" onClick={() => setPrinters((prev) => prev.filter((x) => x.id !== p.id))}>
+                  <Button variant="ghost" size="icon" onClick={() => handleDeletePrinter(p.id)}>
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>
@@ -602,8 +628,8 @@ const PrintCostCalculator = () => {
                 <Input type="number" placeholder="Costo por kWh ($)" value={editingPrinter.costoPorKwh || ""} onChange={(e) => setEditingPrinter({ ...editingPrinter, costoPorKwh: Number(e.target.value) })} />
                 <Input type="number" placeholder="Costo por minuto ($)" value={editingPrinter.costoMinuto || ""} onChange={(e) => setEditingPrinter({ ...editingPrinter, costoMinuto: Number(e.target.value) })} />
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setEditingPrinter(null)} className="flex-1">Cancelar</Button>
-                  <Button className="flex-1 btn-glow border-0" onClick={() => savePrinterItem(editingPrinter)}>Guardar</Button>
+                  <Button variant="outline" onClick={() => setEditingPrinter(null)} className="flex-1" disabled={uploading}>Cancelar</Button>
+                  <Button className="flex-1 btn-glow border-0" onClick={() => savePrinterItem(editingPrinter)} disabled={uploading}>Guardar</Button>
                 </div>
               </div>
             ) : (
