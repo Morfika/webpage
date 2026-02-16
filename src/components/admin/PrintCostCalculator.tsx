@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Plus, Trash2, Calculator, Cpu, ImagePlus, FileText, X, Save, Loader
+  Plus, Trash2, Calculator, Cpu, ImagePlus, FileText, X, Save, Loader, FileSpreadsheet
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -13,66 +13,12 @@ import {
   getQuotationsDB, saveQuotationDB, deleteQuotationDB, uploadQuotationImage,
   type PrinterConfig, type PrintPiece, type Quotation
 } from "@/lib/quotations";
-
-// Calculation helpers
-const calcCostoGramo = (costo1kg: number) => costo1kg / 1000;
-
-const calcCostoMaterial = (costo1kg: number, consumoGramos: number) =>
-  calcCostoGramo(costo1kg) * consumoGramos;
-
-const calcCostoEnergia = (printer: PrinterConfig | undefined, tiempoMinutos: number) => {
-  if (!printer) return 0;
-  // =((((1*consumoWh)/1000)*costoPorKwh)/60)*tiempoMinutos
-  const consumoKwh = (printer.consumoWh / 1000) * (tiempoMinutos / 60);
-  return consumoKwh * printer.costoPorKwh;
-};
-
-const calcCostoUsoMaquina = (printer: PrinterConfig | undefined, tiempoMinutos: number) => {
-  if (!printer) return 0;
-  // =$O$11*G4 donde O$11 es tiempo en minutos y G4 es costo por minuto
-  return tiempoMinutos * printer.costoMinuto;
-};
-
-const calcSobrecostoPorFallo = (costoMaterial: number, costoEnergia: number, costoUsoMaquina: number, porcentajeFallo: number = 0.3) => {
-  // Sobrecosto es un porcentaje del costo base (material + energía + uso máquina)
-  return (costoMaterial + costoEnergia + costoUsoMaquina) * porcentajeFallo;
-};
-
-const calcPorcentajeGanancia = (consumoGramos: number): number => {
-  // =SI((D4)<900; SI(D4<20; 170%; 60%-(D4)*0.06/100); 15%)
-  if (consumoGramos < 900) {
-    if (consumoGramos < 20) {
-      return 1.7; // 170%
-    }
-    return 0.6 - (consumoGramos * 0.06 / 100); // 60% - consumption*0.06/100
-  }
-  return 0.15; // 15%
-};
-
-const calcCostoImpresion = (piece: PrintPiece, printer: PrinterConfig | undefined) => {
-  const costoMaterial = calcCostoMaterial(piece.costo1kg, piece.consumoGramos);
-  const costoEnergia = calcCostoEnergia(printer, piece.tiempoMinutos);
-  const costoUsoMaquina = calcCostoUsoMaquina(printer, piece.tiempoMinutos);
-  const sobrecostoFallo = calcSobrecostoPorFallo(costoMaterial, costoEnergia, costoUsoMaquina);
-  const porcentajeGanancia = calcPorcentajeGanancia(piece.consumoGramos);
-
-  // Fórmula: (E+H+I+J)+((E+H+I+J)*K)
-  const base = costoMaterial + costoEnergia + costoUsoMaquina + sobrecostoFallo;
-  return base + (base * porcentajeGanancia);
-};
-
-const calcPostprocesado = (piece: PrintPiece) => {
-  const costoPrimerMl = piece.primerCosto200ml / 200;
-  const costoPrimer = costoPrimerMl * piece.consumoPrimerGramos;
-  const horasPostprocesado = piece.tiempoPostprocesado / 60;
-  const costoTiempo = horasPostprocesado * piece.costoPorHoraPostprocesado;
-  return costoPrimer + piece.costoLijadoPintura + costoTiempo;
-};
-
-const calcDescuentoGrupo = (totalFilamentoGramos: number): number => {
-  // =MIN(D6/1000 * 10%; 10%)
-  return Math.min((totalFilamentoGramos / 1000) * 0.1, 0.1);
-};
+import {
+  calcCostoGramo, calcCostoMaterial, calcCostoEnergia, calcCostoUsoMaquina,
+  calcSobrecostoPorFallo, calcPorcentajeGanancia, calcCostoImpresion,
+  calcPostprocesado, calcDescuentoGrupo
+} from "@/lib/cost-calculations";
+import QuotationStats from "./QuotationStats";
 
 const defaultPiece = (): PrintPiece => ({
   id: Date.now().toString(),
@@ -100,6 +46,7 @@ const PrintCostCalculator = () => {
   // States
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [printers, setPrinters] = useState<PrinterConfig[]>([]);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
 
@@ -217,6 +164,7 @@ const PrintCostCalculator = () => {
     setCurrentQuotationId(q.id);
     toast({ title: "Cotización cargada para editar" });
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    setShowStats(false); // Ensure we are in calculator mode
   };
 
   const cancelEditing = () => {
@@ -302,6 +250,10 @@ const PrintCostCalculator = () => {
           {currentQuotationId ? "Editando Cotización" : "Cotizador de Impresión"}
         </h2>
         <div className="flex gap-2">
+          <Button variant={showStats ? "default" : "outline"} onClick={() => setShowStats(!showStats)}>
+            <FileSpreadsheet className="w-4 h-4 mr-2" />
+            {showStats ? "Volver a Cotizador" : "Reporte Financiero"}
+          </Button>
           <Button variant="outline" onClick={() => setShowPrinterManager(true)}>
             <Cpu className="w-4 h-4 mr-2" />
             Impresoras
@@ -309,286 +261,292 @@ const PrintCostCalculator = () => {
         </div>
       </div>
 
-      {/* Disclaimer */}
-      <div className="bg-morfika-purple/10 border border-morfika-purple/30 rounded-xl p-4 text-sm text-muted-foreground">
-        Los costos aquí enunciados son meramente relacionados al proceso de impresión 3D, no incluyen diseño ni postprocesado (a menos que se agregue abajo).
-      </div>
-
-      {/* Client name */}
-      <div className="flex items-center gap-4">
-        <label className="text-sm font-medium text-foreground whitespace-nowrap">Cliente:</label>
-        <Input
-          value={clientName}
-          onChange={(e) => setClientName(e.target.value)}
-          placeholder="Nombre del cliente"
-          className="max-w-xs"
-        />
-      </div>
-
-      {/* ─── Pieces ───────────────────────────────────────────── */}
-      {pieces.map((piece, idx) => {
-        const calc = pieceCalcs[idx];
-        const mode = timeInputMode[piece.id] || "minutes";
-        return (
-          <div key={piece.id} className="bg-card border border-border rounded-2xl overflow-hidden">
-            {/* Piece header */}
-            <div className="bg-morfika-purple/10 px-6 py-3 flex justify-between items-center border-b border-border">
-              <div className="flex items-center gap-3">
-                <span className="bg-morfika-purple/30 text-morfika-glow w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">
-                  {idx + 1}
-                </span>
-                <Input
-                  value={piece.name}
-                  onChange={(e) => updatePiece(piece.id, { name: e.target.value })}
-                  placeholder="Nombre de la pieza"
-                  className="bg-transparent border-0 text-foreground font-semibold text-lg p-0 h-auto focus-visible:ring-0 max-w-[300px]"
-                />
-              </div>
-              {pieces.length > 1 && (
-                <Button variant="ghost" size="icon" onClick={() => removePiece(piece.id)}>
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </Button>
-              )}
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Image & basic info */}
-              <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6">
-                {/* Image upload */}
-                <div className="flex flex-col items-center gap-2">
-                  <label className="cursor-pointer group">
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(piece.id, e)} disabled={uploading} />
-                    <div className="w-28 h-28 rounded-xl border-2 border-dashed border-border group-hover:border-morfika-glow/50 transition-colors flex items-center justify-center overflow-hidden bg-muted/30">
-                      {piece.image ? (
-                        <img src={piece.image} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <ImagePlus className="w-8 h-8 text-muted-foreground" />
-                      )}
-                    </div>
-                  </label>
-                  <span className="text-xs text-muted-foreground">{uploading ? "Subiendo..." : "Subir foto"}</span>
-                </div>
-
-                {/* Printing fields */}
-                <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-morfika-glow uppercase tracking-wide">Impresión</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {/* Material */}
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Material</label>
-                      <Select value={piece.material} onValueChange={(v) => updatePiece(piece.id, { material: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="PLA">PLA</SelectItem>
-                          <SelectItem value="PETG">PETG</SelectItem>
-                          <SelectItem value="ABS">ABS</SelectItem>
-                          <SelectItem value="TPU">TPU</SelectItem>
-                          <SelectItem value="Nylon">Nylon</SelectItem>
-                          <SelectItem value="Resina">Resina</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {/* Costo 1kg */}
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Costo 1kg ($)</label>
-                      <Input type="number" value={piece.costo1kg || ""} onChange={(e) => updatePiece(piece.id, { costo1kg: Number(e.target.value) })} />
-                    </div>
-                    {/* Consumo */}
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Consumo (g)</label>
-                      <Input type="number" value={piece.consumoGramos || ""} onChange={(e) => updatePiece(piece.id, { consumoGramos: Number(e.target.value) })} />
-                    </div>
-                    {/* Impresora */}
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Impresora</label>
-                      <Select value={piece.printerId} onValueChange={(v) => updatePiece(piece.id, { printerId: v })}>
-                        <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                        <SelectContent>
-                          {printers.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {/* Tiempo */}
-                    <div className="space-y-1 col-span-2 sm:col-span-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs text-muted-foreground">Tiempo</label>
-                        <button
-                          className="text-[10px] text-morfika-glow underline"
-                          onClick={() => setTimeInputMode((prev) => ({ ...prev, [piece.id]: mode === "minutes" ? "hm" : "minutes" }))}
-                        >
-                          {mode === "minutes" ? "H:M" : "Min"}
-                        </button>
-                      </div>
-                      {mode === "minutes" ? (
-                        <Input
-                          type="number"
-                          value={piece.tiempoMinutos || ""}
-                          onChange={(e) => updatePiece(piece.id, { tiempoMinutos: Number(e.target.value) })}
-                          placeholder="minutos"
-                        />
-                      ) : (
-                        <div className="flex gap-1">
-                          <Input
-                            type="number"
-                            value={Math.floor(piece.tiempoMinutos / 60) || ""}
-                            onChange={(e) => updatePiece(piece.id, { tiempoMinutos: Number(e.target.value) * 60 + (piece.tiempoMinutos % 60) })}
-                            placeholder="h"
-                            className="w-16"
-                          />
-                          <Input
-                            type="number"
-                            value={piece.tiempoMinutos % 60 || ""}
-                            onChange={(e) => updatePiece(piece.id, { tiempoMinutos: Math.floor(piece.tiempoMinutos / 60) * 60 + Number(e.target.value) })}
-                            placeholder="m"
-                            className="w-16"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Calculated printing costs */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 bg-muted/20 rounded-xl p-4">
-                    <CostBadge label="Costo/g" value={formatCOP(calc?.costoGramo || 0)} />
-                    <CostBadge label="Costo Material" value={formatCOP(calc?.costoMaterial || 0)} />
-                    <CostBadge label="Costo Energía" value={formatCOP(calc?.costoEnergia || 0)} />
-                    <CostBadge label="Uso Máquina" value={formatCOP(calc?.costoUsoMaquina || 0)} />
-                    <CostBadge label="Sobrecosto Fallo" value={formatCOP(calc?.sobrecostoFallo || 0)} />
-                    <CostBadge label="% Ganancia" value={`${((calc?.porcentajeGanancia || 0) * 100).toFixed(0)}%`} accent />
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-muted-foreground">Tiempo: {getTimeDisplay(piece.tiempoMinutos)}</span>
-                    <div className="flex-1" />
-                    <div className="bg-morfika-purple/20 border border-morfika-purple/40 rounded-xl px-5 py-2">
-                      <span className="text-xs text-muted-foreground block">Costo Impresión</span>
-                      <span className="text-lg font-bold text-morfika-glow">{formatCOP(calc?.costoImpresion || 0)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Post-processing */}
-              <details className="group">
-                <summary className="cursor-pointer text-sm font-semibold text-morfika-glow uppercase tracking-wide flex items-center gap-2 select-none">
-                  <span className="transition-transform group-open:rotate-90">▶</span>
-                  Postprocesado (opcional)
-                </summary>
-                <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Primer costo 200ml ($)</label>
-                    <Input type="number" value={piece.primerCosto200ml || ""} onChange={(e) => updatePiece(piece.id, { primerCosto200ml: Number(e.target.value) })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Consumo Primer (ml)</label>
-                    <Input type="number" value={piece.consumoPrimerGramos || ""} onChange={(e) => updatePiece(piece.id, { consumoPrimerGramos: Number(e.target.value) })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Lijado y Pintura ($)</label>
-                    <Input type="number" value={piece.costoLijadoPintura || ""} onChange={(e) => updatePiece(piece.id, { costoLijadoPintura: Number(e.target.value) })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Tiempo postproc. (min)</label>
-                    <Input type="number" value={piece.tiempoPostprocesado || ""} onChange={(e) => updatePiece(piece.id, { tiempoPostprocesado: Number(e.target.value) })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Costo/hora postproc. ($)</label>
-                    <Input type="number" value={piece.costoPorHoraPostprocesado || ""} onChange={(e) => updatePiece(piece.id, { costoPorHoraPostprocesado: Number(e.target.value) })} />
-                  </div>
-                </div>
-                <div className="mt-3 bg-muted/20 rounded-xl p-3 flex justify-end">
-                  <CostBadge label="Costo Postprocesado" value={formatCOP(calc?.costoPostprocesado || 0)} />
-                </div>
-              </details>
-
-              {/* Piece total */}
-              <div className="flex justify-end">
-                <div className="bg-gradient-to-r from-morfika-purple/30 to-morfika-blue/30 border border-morfika-glow/30 rounded-xl px-6 py-3 text-right">
-                  <span className="text-xs text-muted-foreground block">Costo de Venta</span>
-                  <span className="text-xl font-bold text-foreground">{formatCOP(calc?.costoVenta || 0)}</span>
-                </div>
-              </div>
-            </div>
+      {showStats ? (
+        <QuotationStats quotations={quotations} printers={printers} />
+      ) : (
+        <>
+          {/* Disclaimer */}
+          <div className="bg-morfika-purple/10 border border-morfika-purple/30 rounded-xl p-4 text-sm text-muted-foreground">
+            Los costos aquí enunciados son meramente relacionados al proceso de impresión 3D, no incluyen diseño ni postprocesado (a menos que se agregue abajo).
           </div>
-        );
-      })}
 
-      {/* Add piece */}
-      <Button variant="outline" onClick={addPiece} className="w-full border-dashed border-2">
-        <Plus className="w-4 h-4 mr-2" />
-        Agregar Pieza
-      </Button>
+          {/* Client name */}
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium text-foreground whitespace-nowrap">Cliente:</label>
+            <Input
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              placeholder="Nombre del cliente"
+              className="max-w-xs"
+            />
+          </div>
 
-      {/* ─── Group Summary ────────────────────────────────────── */}
-      <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-        <h3 className="text-lg font-bold text-foreground">Resumen de Cotización</h3>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          <CostBadge label="Piezas" value={String(pieces.length)} />
-          <CostBadge label="Filamento Total" value={`${totalFilamento}g`} />
-          <CostBadge label="Venta Total" value={formatCOP(ventaTotal)} />
-          <CostBadge label="Desc. Grupo" value={`${(descuentoGrupo * 100).toFixed(2)}%`} accent />
-          <CostBadge label="Valor Venta" value={formatCOP(valorVenta)} accent />
-          <CostBadge label="Ganancia Neta" value={formatCOP(gananciaNeta)} />
-        </div>
-
-        <p className="text-xs text-muted-foreground">
-          El descuento grupal se aplica sobre el total: MIN(filamento_total_g / 1000 × 10%, 10%). Máximo 10% con 1kg+.
-          Calculos dinámicos.
-        </p>
-
-        <div className="flex gap-3 justify-end">
-          <Button variant="outline" onClick={cancelEditing} disabled={uploading}>
-            {currentQuotationId ? "Cancelar Edición" : "Limpiar"}
-          </Button>
-          <Button className="btn-glow border-0" onClick={handleSaveQuotation} disabled={uploading}>
-            <Save className="w-4 h-4 mr-2" />
-            {(uploading) ? "Guardando..." : (currentQuotationId ? "Actualizar Cotización" : "Guardar Cotización")}
-          </Button>
-        </div>
-      </div>
-
-      {/* ─── Saved Quotations ─────────────────────────────────── */}
-      {quotations.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-            <FileText className="w-5 h-5 text-morfika-glow" />
-            Cotizaciones Guardadas
-          </h3>
-          <div className="grid gap-3">
-            {quotations.map((q) => {
-              const qTotalFil = q.pieces.reduce((s, p) => s + p.consumoGramos, 0);
-              const qCalcs = q.pieces.map((piece) => {
-                const printer = getPrinter(piece.printerId);
-                return calcCostoImpresion(piece, printer) + calcPostprocesado(piece);
-              });
-              const qTotal = qCalcs.reduce((s, c) => s + c, 0);
-              const qDesc = q.pieces.length > 1 ? calcDescuentoGrupo(qTotalFil) : 0;
-              const qValor = qTotal * (1 - qDesc);
-              return (
-                <div key={q.id} className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-foreground">{q.clientName}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {q.pieces.length} pieza{q.pieces.length > 1 ? "s" : ""} · {new Date(q.createdAt).toLocaleDateString("es-CO")}
-                    </p>
+          {/* ─── Pieces ───────────────────────────────────────────── */}
+          {pieces.map((piece, idx) => {
+            const calc = pieceCalcs[idx];
+            const mode = timeInputMode[piece.id] || "minutes";
+            return (
+              <div key={piece.id} className="bg-card border border-border rounded-2xl overflow-hidden">
+                {/* Piece header */}
+                <div className="bg-morfika-purple/10 px-6 py-3 flex justify-between items-center border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <span className="bg-morfika-purple/30 text-morfika-glow w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">
+                      {idx + 1}
+                    </span>
+                    <Input
+                      value={piece.name}
+                      onChange={(e) => updatePiece(piece.id, { name: e.target.value })}
+                      placeholder="Nombre de la pieza"
+                      className="bg-transparent border-0 text-foreground font-semibold text-lg p-0 h-auto focus-visible:ring-0 max-w-[300px]"
+                    />
                   </div>
-                  <span className="font-bold text-morfika-glow">{formatCOP(qValor)}</span>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => loadQuotation(q)} title="Ver / Editar">
-                      <FileText className="w-4 h-4 text-morfika-glow" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteQuotation(q.id)}>
+                  {pieces.length > 1 && (
+                    <Button variant="ghost" size="icon" onClick={() => removePiece(piece.id)}>
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
+                  )}
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {/* Image & basic info */}
+                  <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6">
+                    {/* Image upload */}
+                    <div className="flex flex-col items-center gap-2">
+                      <label className="cursor-pointer group">
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(piece.id, e)} disabled={uploading} />
+                        <div className="w-28 h-28 rounded-xl border-2 border-dashed border-border group-hover:border-morfika-glow/50 transition-colors flex items-center justify-center overflow-hidden bg-muted/30">
+                          {piece.image ? (
+                            <img src={piece.image} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <ImagePlus className="w-8 h-8 text-muted-foreground" />
+                          )}
+                        </div>
+                      </label>
+                      <span className="text-xs text-muted-foreground">{uploading ? "Subiendo..." : "Subir foto"}</span>
+                    </div>
+
+                    {/* Printing fields */}
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-semibold text-morfika-glow uppercase tracking-wide">Impresión</h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {/* Material */}
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Material</label>
+                          <Select value={piece.material} onValueChange={(v) => updatePiece(piece.id, { material: v })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="PLA">PLA</SelectItem>
+                              <SelectItem value="PETG">PETG</SelectItem>
+                              <SelectItem value="ABS">ABS</SelectItem>
+                              <SelectItem value="TPU">TPU</SelectItem>
+                              <SelectItem value="Nylon">Nylon</SelectItem>
+                              <SelectItem value="Resina">Resina</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {/* Costo 1kg */}
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Costo 1kg ($)</label>
+                          <Input type="number" value={piece.costo1kg || ""} onChange={(e) => updatePiece(piece.id, { costo1kg: Number(e.target.value) })} />
+                        </div>
+                        {/* Consumo */}
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Consumo (g)</label>
+                          <Input type="number" value={piece.consumoGramos || ""} onChange={(e) => updatePiece(piece.id, { consumoGramos: Number(e.target.value) })} />
+                        </div>
+                        {/* Impresora */}
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Impresora</label>
+                          <Select value={piece.printerId} onValueChange={(v) => updatePiece(piece.id, { printerId: v })}>
+                            <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                            <SelectContent>
+                              {printers.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {/* Tiempo */}
+                        <div className="space-y-1 col-span-2 sm:col-span-1">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs text-muted-foreground">Tiempo</label>
+                            <button
+                              className="text-[10px] text-morfika-glow underline"
+                              onClick={() => setTimeInputMode((prev) => ({ ...prev, [piece.id]: mode === "minutes" ? "hm" : "minutes" }))}
+                            >
+                              {mode === "minutes" ? "H:M" : "Min"}
+                            </button>
+                          </div>
+                          {mode === "minutes" ? (
+                            <Input
+                              type="number"
+                              value={piece.tiempoMinutos || ""}
+                              onChange={(e) => updatePiece(piece.id, { tiempoMinutos: Number(e.target.value) })}
+                              placeholder="minutos"
+                            />
+                          ) : (
+                            <div className="flex gap-1">
+                              <Input
+                                type="number"
+                                value={Math.floor(piece.tiempoMinutos / 60) || ""}
+                                onChange={(e) => updatePiece(piece.id, { tiempoMinutos: Number(e.target.value) * 60 + (piece.tiempoMinutos % 60) })}
+                                placeholder="h"
+                                className="w-16"
+                              />
+                              <Input
+                                type="number"
+                                value={piece.tiempoMinutos % 60 || ""}
+                                onChange={(e) => updatePiece(piece.id, { tiempoMinutos: Math.floor(piece.tiempoMinutos / 60) * 60 + Number(e.target.value) })}
+                                placeholder="m"
+                                className="w-16"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Calculated printing costs */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 bg-muted/20 rounded-xl p-4">
+                        <CostBadge label="Costo/g" value={formatCOP(calc?.costoGramo || 0)} />
+                        <CostBadge label="Costo Material" value={formatCOP(calc?.costoMaterial || 0)} />
+                        <CostBadge label="Costo Energía" value={formatCOP(calc?.costoEnergia || 0)} />
+                        <CostBadge label="Uso Máquina" value={formatCOP(calc?.costoUsoMaquina || 0)} />
+                        <CostBadge label="Sobrecosto Fallo" value={formatCOP(calc?.sobrecostoFallo || 0)} />
+                        <CostBadge label="% Ganancia" value={`${((calc?.porcentajeGanancia || 0) * 100).toFixed(0)}%`} accent />
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm text-muted-foreground">Tiempo: {getTimeDisplay(piece.tiempoMinutos)}</span>
+                        <div className="flex-1" />
+                        <div className="bg-morfika-purple/20 border border-morfika-purple/40 rounded-xl px-5 py-2">
+                          <span className="text-xs text-muted-foreground block">Costo Impresión</span>
+                          <span className="text-lg font-bold text-morfika-glow">{formatCOP(calc?.costoImpresion || 0)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Post-processing */}
+                  <details className="group">
+                    <summary className="cursor-pointer text-sm font-semibold text-morfika-glow uppercase tracking-wide flex items-center gap-2 select-none">
+                      <span className="transition-transform group-open:rotate-90">▶</span>
+                      Postprocesado (opcional)
+                    </summary>
+                    <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Primer costo 200ml ($)</label>
+                        <Input type="number" value={piece.primerCosto200ml || ""} onChange={(e) => updatePiece(piece.id, { primerCosto200ml: Number(e.target.value) })} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Consumo Primer (ml)</label>
+                        <Input type="number" value={piece.consumoPrimerGramos || ""} onChange={(e) => updatePiece(piece.id, { consumoPrimerGramos: Number(e.target.value) })} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Lijado y Pintura ($)</label>
+                        <Input type="number" value={piece.costoLijadoPintura || ""} onChange={(e) => updatePiece(piece.id, { costoLijadoPintura: Number(e.target.value) })} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Tiempo postproc. (min)</label>
+                        <Input type="number" value={piece.tiempoPostprocesado || ""} onChange={(e) => updatePiece(piece.id, { tiempoPostprocesado: Number(e.target.value) })} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Costo/hora postproc. ($)</label>
+                        <Input type="number" value={piece.costoPorHoraPostprocesado || ""} onChange={(e) => updatePiece(piece.id, { costoPorHoraPostprocesado: Number(e.target.value) })} />
+                      </div>
+                    </div>
+                    <div className="mt-3 bg-muted/20 rounded-xl p-3 flex justify-end">
+                      <CostBadge label="Costo Postprocesado" value={formatCOP(calc?.costoPostprocesado || 0)} />
+                    </div>
+                  </details>
+
+                  {/* Piece total */}
+                  <div className="flex justify-end">
+                    <div className="bg-gradient-to-r from-morfika-purple/30 to-morfika-blue/30 border border-morfika-glow/30 rounded-xl px-6 py-3 text-right">
+                      <span className="text-xs text-muted-foreground block">Costo de Venta</span>
+                      <span className="text-xl font-bold text-foreground">{formatCOP(calc?.costoVenta || 0)}</span>
+                    </div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            );
+          })}
+
+          {/* Add piece */}
+          <Button variant="outline" onClick={addPiece} className="w-full border-dashed border-2">
+            <Plus className="w-4 h-4 mr-2" />
+            Agregar Pieza
+          </Button>
+
+          {/* ─── Group Summary ────────────────────────────────────── */}
+          <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+            <h3 className="text-lg font-bold text-foreground">Resumen de Cotización</h3>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              <CostBadge label="Piezas" value={String(pieces.length)} />
+              <CostBadge label="Filamento Total" value={`${totalFilamento}g`} />
+              <CostBadge label="Venta Total" value={formatCOP(ventaTotal)} />
+              <CostBadge label="Desc. Grupo" value={`${(descuentoGrupo * 100).toFixed(2)}%`} accent />
+              <CostBadge label="Valor Venta" value={formatCOP(valorVenta)} accent />
+              <CostBadge label="Ganancia Neta" value={formatCOP(gananciaNeta)} />
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              El descuento grupal se aplica sobre el total: MIN(filamento_total_g / 1000 × 10%, 10%). Máximo 10% con 1kg+.
+              Calculos dinámicos.
+            </p>
+
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={cancelEditing} disabled={uploading}>
+                {currentQuotationId ? "Cancelar Edición" : "Limpiar"}
+              </Button>
+              <Button className="btn-glow border-0" onClick={handleSaveQuotation} disabled={uploading}>
+                <Save className="w-4 h-4 mr-2" />
+                {(uploading) ? "Guardando..." : (currentQuotationId ? "Actualizar Cotización" : "Guardar Cotización")}
+              </Button>
+            </div>
           </div>
-        </div>
+
+          {/* ─── Saved Quotations ─────────────────────────────────── */}
+          {quotations.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <FileText className="w-5 h-5 text-morfika-glow" />
+                Cotizaciones Guardadas
+              </h3>
+              <div className="grid gap-3">
+                {quotations.map((q) => {
+                  const qTotalFil = q.pieces.reduce((s, p) => s + p.consumoGramos, 0);
+                  const qCalcs = q.pieces.map((piece) => {
+                    const printer = getPrinter(piece.printerId);
+                    return calcCostoImpresion(piece, printer) + calcPostprocesado(piece);
+                  });
+                  const qTotal = qCalcs.reduce((s, c) => s + c, 0);
+                  const qDesc = q.pieces.length > 1 ? calcDescuentoGrupo(qTotalFil) : 0;
+                  const qValor = qTotal * (1 - qDesc);
+                  return (
+                    <div key={q.id} className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-foreground">{q.clientName}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {q.pieces.length} pieza{q.pieces.length > 1 ? "s" : ""} · {new Date(q.createdAt).toLocaleDateString("es-CO")}
+                        </p>
+                      </div>
+                      <span className="font-bold text-morfika-glow">{formatCOP(qValor)}</span>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => loadQuotation(q)} title="Ver / Editar">
+                          <FileText className="w-4 h-4 text-morfika-glow" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteQuotation(q.id)}>
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* ─── Printer Manager Modal ────────────────────────────── */}
