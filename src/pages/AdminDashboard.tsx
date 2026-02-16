@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  checkAuth, 
+import {
+  checkAuth,
   logout,
-  getProducts, 
+  getProducts,
   addProduct,
   updateProduct,
   deleteProduct as deleteProductDB,
@@ -24,42 +24,44 @@ import {
 } from "@/lib/data";
 import { getInstagramFollowers } from "@/lib/instagram";
 import { uploadImage, deleteImage } from "@/lib/supabase";
-import { 
-  Printer, 
-  LogOut, 
-  Package, 
-  Ticket, 
-  Gift, 
+import {
+  Printer,
+  LogOut,
+  Package,
+  Ticket,
+  Gift,
   Plus,
   Trash2,
   Edit,
   X,
   Save,
   Upload,
-  Loader
+  Loader,
+  Calculator
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import PrintCostCalculator from "@/components/admin/PrintCostCalculator";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [products, setProducts] = useState<Product[]>([]);
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [giveaways, setGiveaways] = useState<Giveaway[]>([]);
   const [instagramFollowers, setInstagramFollowers] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  
+
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingRaffle, setEditingRaffle] = useState<Raffle | null>(null);
   const [editingGiveaway, setEditingGiveaway] = useState<Giveaway | null>(null);
   const [showRaffleNumbers, setShowRaffleNumbers] = useState<Raffle | null>(null);
-  
+
   const [productImagePreview, setProductImagePreview] = useState<string>("");
   const [raffleImagePreview, setRaffleImagePreview] = useState<string>("");
   const [giveawayImagePreview, setGiveawayImagePreview] = useState<string>("");
@@ -110,7 +112,7 @@ const AdminDashboard = () => {
     try {
       setUploading(true);
       const imageUrl = await uploadImage(file, folder);
-      
+
       if (imageUrl) {
         setPreview(imageUrl);
         setObject({ ...obj, image: imageUrl });
@@ -194,15 +196,15 @@ const AdminDashboard = () => {
       if (!raffleNum) return;
 
       const newSoldStatus = !raffleNum.sold;
-      
+
       let buyerCode: string | undefined;
       if (newSoldStatus && (buyerName || buyerPhone)) {
         // Generar código único cuando se registra una venta
         buyerCode = await generateUniqueBuyerCode(raffleId, number);
       }
-      
+
       await updateRaffleNumber(raffleId, number, newSoldStatus, newSoldStatus ? (buyerName || raffleNum.buyerName) : undefined, newSoldStatus ? (buyerPhone || raffleNum.buyerPhone) : undefined, buyerCode || raffleNum.buyerCode, newSoldStatus ? paid : undefined);
-      
+
       // Mostrar el código al usuario si se generó uno
       if (buyerCode) {
         const statusText = paid ? "pagada" : "apartada";
@@ -210,9 +212,9 @@ const AdminDashboard = () => {
       } else {
         toast({ title: newSoldStatus ? "Número marcado como vendido" : "Número marcado como disponible" });
       }
-      
+
       await loadData();
-      
+
       if (showRaffleNumbers) {
         const updated = raffles.find(r => r.id === raffleId);
         if (updated) setShowRaffleNumbers(updated);
@@ -232,10 +234,10 @@ const AdminDashboard = () => {
       if (!raffleNum) return;
 
       await updateRaffleNumber(raffleId, number, true, raffleNum.buyerName, raffleNum.buyerPhone, raffleNum.buyerCode, !currentPaid);
-      
+
       toast({ title: !currentPaid ? "✓ Marcado como pagado" : "Marcado como no pagado" });
       await loadData();
-      
+
       if (showRaffleNumbers) {
         const updated = raffles.find(r => r.id === raffleId);
         if (updated) setShowRaffleNumbers(updated);
@@ -318,13 +320,17 @@ const AdminDashboard = () => {
                 <Gift className="w-4 h-4 mr-2" />
                 Sorteos
               </TabsTrigger>
+              <TabsTrigger value="quoter" className="data-[state=active]:bg-morfika-purple/20">
+                <Calculator className="w-4 h-4 mr-2" />
+                Cotizador
+              </TabsTrigger>
             </TabsList>
 
             {/* Products Tab */}
             <TabsContent value="products" className="space-y-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-foreground">Productos</h2>
-                <Button 
+                <Button
                   onClick={() => setEditingProduct({ id: "", name: "", description: "", price: 0, image: "/placeholder.svg", category: "" })}
                   className="btn-glow border-0"
                 >
@@ -358,7 +364,7 @@ const AdminDashboard = () => {
             <TabsContent value="raffles" className="space-y-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-foreground">Rifas</h2>
-                <Button 
+                <Button
                   onClick={() => setEditingRaffle({ id: "", title: "", description: "", image: "/placeholder.svg", price: 0, endDate: "", numbers: [] })}
                   className="btn-glow border-0"
                 >
@@ -397,7 +403,7 @@ const AdminDashboard = () => {
             <TabsContent value="giveaways" className="space-y-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-foreground">Sorteos</h2>
-                <Button 
+                <Button
                   onClick={() => setEditingGiveaway({ id: "", title: "", description: "", image: "/placeholder.svg", instagramRequired: true, currentFollowers: instagramFollowers, targetFollowers: 1000, endDate: "", active: true })}
                   className="btn-glow border-0"
                 >
@@ -427,6 +433,11 @@ const AdminDashboard = () => {
                   </div>
                 ))}
               </div>
+            </TabsContent>
+
+            {/* Quoter Tab */}
+            <TabsContent value="quoter" className="space-y-6">
+              <PrintCostCalculator />
             </TabsContent>
           </Tabs>
         )}
@@ -460,7 +471,7 @@ const AdminDashboard = () => {
               onChange={(e) => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })}
               required
             />
-            
+
             {/* Image Upload */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Imagen del Producto</label>
@@ -521,7 +532,7 @@ const AdminDashboard = () => {
               value={editingRaffle.endDate}
               onChange={(e) => setEditingRaffle({ ...editingRaffle, endDate: e.target.value })}
             />
-            
+
             {/* Image Upload */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Imagen de la Rifa</label>
@@ -587,7 +598,7 @@ const AdminDashboard = () => {
               value={editingGiveaway.endDate}
               onChange={(e) => setEditingGiveaway({ ...editingGiveaway, endDate: e.target.value })}
             />
-            
+
             {/* Image Upload */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Imagen del Sorteo</label>
@@ -623,7 +634,7 @@ const AdminDashboard = () => {
       {showRaffleNumbers && (
         <Modal onClose={() => setShowRaffleNumbers(null)} wide>
           <h3 className="text-xl font-bold mb-4">Números: {showRaffleNumbers.title}</h3>
-          
+
           {/* Legend */}
           <div className="mb-6 p-3 rounded-lg bg-muted/50 border border-border">
             <div className="flex flex-wrap gap-6">
@@ -675,19 +686,18 @@ const AdminDashboard = () => {
                     }
                   }
                 }}
-                className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs font-medium transition-all cursor-pointer ${
-                  !num.sold
-                    ? "bg-morfika-purple/20 text-morfika-glow border border-morfika-purple/30 hover:bg-morfika-purple/40"
-                    : num.paid
+                className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs font-medium transition-all cursor-pointer ${!num.sold
+                  ? "bg-morfika-purple/20 text-morfika-glow border border-morfika-purple/30 hover:bg-morfika-purple/40"
+                  : num.paid
                     ? "bg-destructive/20 text-destructive border border-destructive/30 hover:bg-destructive/30"
                     : "bg-yellow-500/20 text-yellow-600 border border-yellow-500/30 hover:bg-yellow-500/30"
-                }`}
+                  }`}
                 title={
-                  !num.sold 
-                    ? "Disponible" 
+                  !num.sold
+                    ? "Disponible"
                     : num.paid
-                    ? `Pagada\nComprador: ${num.buyerName}\nTeléfono: ${num.buyerPhone}\nCódigo: ${num.buyerCode}`
-                    : `Apartada\nComprador: ${num.buyerName}\nTeléfono: ${num.buyerPhone}\nCódigo: ${num.buyerCode}`
+                      ? `Pagada\nComprador: ${num.buyerName}\nTeléfono: ${num.buyerPhone}\nCódigo: ${num.buyerCode}`
+                      : `Apartada\nComprador: ${num.buyerName}\nTeléfono: ${num.buyerPhone}\nCódigo: ${num.buyerCode}`
                 }
               >
                 {num.number}
@@ -703,7 +713,7 @@ const AdminDashboard = () => {
 // Modal component
 const Modal = ({ children, onClose, wide = false }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm" onClick={onClose}>
-    <div 
+    <div
       className={`bg-card rounded-2xl border border-border p-6 shadow-2xl ${wide ? 'max-w-3xl' : 'max-w-md'} w-full max-h-[90vh] overflow-y-auto`}
       onClick={(e) => e.stopPropagation()}
     >
