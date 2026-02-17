@@ -147,7 +147,16 @@ const QuotationStats = ({ quotations, printers }: QuotationStatsProps) => {
                                 mode="range"
                                 defaultMonth={dateRange.from}
                                 selected={dateRange}
-                                onSelect={(range: any) => setDateRange(range)}
+                                onSelect={(range: any, selectedDay: any) => {
+                                    // Si ya hay un rango completo seleccionado y el usuario hace click,
+                                    // reiniciamos la selección comenzando desde el día clickeado.
+                                    // Esto permite mover la fecha inicial libremente "hacia adelante".
+                                    if (dateRange?.from && dateRange?.to && selectedDay) {
+                                        setDateRange({ from: selectedDay, to: undefined });
+                                    } else {
+                                        setDateRange(range || { from: undefined, to: undefined });
+                                    }
+                                }}
                                 numberOfMonths={2}
                             />
                         </PopoverContent>
